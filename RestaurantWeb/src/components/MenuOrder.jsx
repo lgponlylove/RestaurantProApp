@@ -45,9 +45,10 @@ export default function MenuOrder({ table, onBack, cart, updateCart, clearCart, 
     try {
       const ticketId = Date.now().toString();
       const orderDetails = newItems.map(i => `${i.quantity}x ${i.name}`).join(', ');
+      const newItemsTotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const updatedCart = normalizedCart.map(i => i.status === 'new' ? { ...i, status: 'cooking', ticketId } : i);
       updateCart(updatedCart);
-      await signalRService.sendNewOrder(table.id, orderDetails, ticketId);
+      await signalRService.sendNewOrder(table.id, orderDetails, ticketId, newItemsTotal);
       showToast('Đã đặt món thành công!');
       onBack();
     } catch (err) {

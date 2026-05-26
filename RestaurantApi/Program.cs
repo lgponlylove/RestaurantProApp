@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RestaurantApi.Data;
 using RestaurantApi.Hubs;
+using RestaurantApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,6 +47,91 @@ app.MapGet("/api/tables", async (RestaurantDbContext db) =>
 
 app.MapGet("/api/menu", async (RestaurantDbContext db) =>
     await db.MenuItems.ToListAsync());
+
+// ── Thu Ngân APIs ────────────────────────────────────────────────────
+app.MapGet("/api/orders/active", async (RestaurantDbContext db) =>
+    await db.Orders.Where(o => !o.IsPaid).ToListAsync());
+
+app.MapGet("/api/invoices", async (RestaurantDbContext db) =>
+    await db.Invoices.OrderByDescending(i => i.CreatedAt).ToListAsync());
+
+// ── Quản Lý Thực Đơn CRUD ────────────────────────────────────────────
+app.MapPost("/api/menu", async (RestaurantDbContext db, MenuItem item) =>
+{
+    db.MenuItems.Add(item);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/menu/{item.Id}", item);
+});
+
+app.MapPut("/api/menu/{id}", async (RestaurantDbContext db, int id, MenuItem updatedItem) =>
+{
+    var item = await db.MenuItems.FindAsync(id);
+    if (item == null) return Results.NotFound();
+    
+    item.Name = updatedItem.Name;
+    item.Price = updatedItem.Price;
+    item.Category = updatedItem.Category;
+    item.ImageUrl = updatedItem.ImageUrl;
+    item.IsHot = updatedItem.IsHot;
+    
+    await db.SaveChangesAsync();
+    return Results.Ok(item);
+});
+
+app.MapDelete("/api/menu/{id}", async (RestaurantDbContext db, int id) =>
+{
+    var item = await db.MenuItems.FindAsync(id);
+    if (item == null) return Results.NotFound();
+    
+    db.MenuItems.Remove(item);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { message = "Đã xóa món ăn thành công" });
+});
+
+// ── Thống Kê Doanh Thu ───────────────────────────────────────────────
+app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
+{
+    var invoices = await db.Invoices.ToListAsync();
+    double totalRevenue = invoices.Sum(i => i.TotalAmount);
+    int totalInvoices = invoices.Count;
+
+    // Phân tích món ăn bán chạy nhất từ chuỗi OrderDetails
+    var itemCounts = new Dictionary<string, int>();
+    foreach (var inv in invoices)
+    {
+        var parts = inv.OrderDetails.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var part in parts)
+        {
+            var cleanPart = part.Trim();
+            var xIndex = cleanPart.IndexOf('x');
+            if (xIndex > 0)
+            {
+                var qtyStr = cleanPart.Substring(0, xIndex).Trim();
+                var nameStr = cleanPart.Substring(xIndex + 1).Trim();
+                if (int.TryParse(qtyStr, out int qty))
+                {
+                    if (itemCounts.ContainsKey(nameStr))
+                        itemCounts[nameStr] += qty;
+                    else
+                        itemCounts[nameStr] = qty;
+                }
+            }
+        }
+    }
+
+    var bestSellers = itemCounts
+        .OrderByDescending(kv => kv.Value)
+        .Take(5)
+        .Select(kv => new { Name = kv.Key, Quantity = kv.Value })
+        .ToList();
+
+    return Results.Ok(new
+    {
+        TotalRevenue = totalRevenue,
+        TotalInvoices = totalInvoices,
+        BestSellers = bestSellers
+    });
+});
 
 // ── Chạy với PORT từ môi trường (Railway cung cấp) ───────────────────
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5296";

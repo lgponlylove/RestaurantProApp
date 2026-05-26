@@ -2,14 +2,14 @@ using System;
 
 namespace RestaurantApi.Models
 {
-    public class Order
+    public class Invoice
     {
         public int Id { get; set; }
         public int TableId { get; set; }
         public string TableName { get; set; } = string.Empty;
-        public string OrderDetails { get; set; } = string.Empty; // Danh sách món dạng: "2x Mực Hấp, 1x Bia"
+        public string OrderDetails { get; set; } = string.Empty;
         public double TotalAmount { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public bool IsPaid { get; set; } = false;
+        public string PaymentMethod { get; set; } = "Tiền mặt";
     }
 }

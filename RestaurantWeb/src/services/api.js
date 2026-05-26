@@ -10,6 +10,40 @@ export const api = {
     getMenuItems: async () => {
         const res = await fetch(`${API_BASE_URL}/api/menu`);
         return res.json();
+    },
+    getActiveOrders: async () => {
+        const res = await fetch(`${API_BASE_URL}/api/orders/active`);
+        return res.json();
+    },
+    getInvoices: async () => {
+        const res = await fetch(`${API_BASE_URL}/api/invoices`);
+        return res.json();
+    },
+    addMenuItem: async (item) => {
+        const res = await fetch(`${API_BASE_URL}/api/menu`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+        return res.json();
+    },
+    editMenuItem: async (id, item) => {
+        const res = await fetch(`${API_BASE_URL}/api/menu/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item)
+        });
+        return res.json();
+    },
+    deleteMenuItem: async (id) => {
+        const res = await fetch(`${API_BASE_URL}/api/menu/${id}`, {
+            method: 'DELETE'
+        });
+        return res.json();
+    },
+    getRevenueStats: async () => {
+        const res = await fetch(`${API_BASE_URL}/api/stats/revenue`);
+        return res.json();
     }
 };
 
@@ -65,15 +99,15 @@ class SignalRService {
         this.listeners[event].forEach(cb => cb(data));
     }
 
-    async sendNewOrder(tableId, orderDetails, ticketId) {
+    async sendNewOrder(tableId, orderDetails, ticketId, totalAmount) {
         if (this.connection) {
-            await this.connection.invoke("SendNewOrder", tableId, orderDetails, ticketId);
+            await this.connection.invoke("SendNewOrder", tableId, orderDetails, ticketId, totalAmount);
         }
     }
 
-    async checkoutTable(tableId) {
+    async checkoutTable(tableId, paymentMethod = "Tiền mặt") {
         if (this.connection) {
-            await this.connection.invoke("CheckoutTable", tableId);
+            await this.connection.invoke("CheckoutTable", tableId, paymentMethod);
         }
     }
 

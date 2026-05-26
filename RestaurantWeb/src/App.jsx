@@ -5,6 +5,8 @@ import TableDashboard from './components/TableDashboard';
 import MenuOrder from './components/MenuOrder';
 import KitchenDashboard from './components/KitchenDashboard';
 import CustomerOrder from './pages/CustomerOrder';
+import CashierDashboard from './components/CashierDashboard';
+import ManagerDashboard from './components/ManagerDashboard';
 
 function StaffApp() {
   const [currentView, setCurrentView] = useState('tables');
@@ -89,7 +91,21 @@ function StaffApp() {
             onClick={() => setCurrentView('kitchen')}
             style={{ borderColor: currentView === 'kitchen' ? 'var(--danger-color)' : '' }}
           >
-            👨‍🍳 Nhà Bếp
+            👨‍🍳 Bếp
+          </button>
+          <button
+            className="glass-button"
+            onClick={() => setCurrentView('cashier')}
+            style={{ borderColor: currentView === 'cashier' ? 'var(--primary-color)' : '' }}
+          >
+            💰 Thu Ngân
+          </button>
+          <button
+            className="glass-button"
+            onClick={() => setCurrentView('manager')}
+            style={{ borderColor: currentView === 'manager' ? 'var(--success-color)' : '' }}
+          >
+            ⚙️ Quản Trị
           </button>
         </div>
       </header>
@@ -114,6 +130,16 @@ function StaffApp() {
           <KitchenDashboard
             tickets={tickets}
             setTickets={setTickets}
+            showToast={showToast}
+          />
+        )}
+        {currentView === 'cashier' && (
+          <CashierDashboard
+            showToast={showToast}
+          />
+        )}
+        {currentView === 'manager' && (
+          <ManagerDashboard
             showToast={showToast}
           />
         )}

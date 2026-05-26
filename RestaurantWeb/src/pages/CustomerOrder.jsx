@@ -53,7 +53,7 @@ export default function CustomerOrder() {
     try {
       const ticketId = Date.now().toString();
       const orderDetails = cart.map(i => `${i.quantity}x ${i.name}`).join(', ');
-      await signalRService.sendNewOrder(parseInt(tableId), orderDetails, ticketId);
+      await signalRService.sendNewOrder(parseInt(tableId), orderDetails, ticketId, totalAmount);
       setOrdered(true);
       setCart([]);
       setShowCart(false);
