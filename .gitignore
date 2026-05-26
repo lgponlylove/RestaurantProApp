@@ -1,0 +1,20 @@
+# ===== CHUNG =====
+.DS_Store
+Thumbs.db
+
+# ===== BACKEND (ASP.NET Core) =====
+RestaurantApi/bin/
+RestaurantApi/obj/
+RestaurantApi/*.db
+RestaurantApi/*.db-shm
+RestaurantApi/*.db-wal
+RestaurantApi/appsettings.Development.json
+
+# ===== FRONTEND (React/Vite) =====
+RestaurantWeb/node_modules/
+RestaurantWeb/dist/
+RestaurantWeb/.env
+RestaurantWeb/.env.local
+
+# Test files
+RestaurantWeb/test.js
