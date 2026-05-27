@@ -149,7 +149,7 @@ export default function CustomerOrder() {
             Đã Gửi Yêu Cầu!
           </h1>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.7, fontSize: '0.95rem' }}>
-            Món ăn đang chờ <strong>Nhân viên phục vụ</strong> tại bàn phê duyệt để chuyển xuống nhà bếp.<br />Vui lòng đợi giây lát, chúng tôi sẽ chế biến ngay! ☕
+            Món ăn đang chờ <strong>Nhân viên phục vụ</strong> xử lý.<br />Vui lòng đợi giây lát, chúng tôi sẽ chế biến ngay! ☕
           </p>
           <button
             className="glass-button btn-success"
