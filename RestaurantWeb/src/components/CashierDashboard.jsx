@@ -185,6 +185,92 @@ export default function CashierDashboard({ showToast }) {
     setShowItemSelectModal(true);
   };
 
+  const handleCancelSingleItem = async (orderId, orderDetails, choiceIdx, itemName, qty) => {
+    const items = orderDetails.split(',').map(s => s.trim()).filter(Boolean);
+    
+    // Nhập mã PIN Quản lý để phê duyệt hủy món lẻ qua custom modal
+    requestPin(`Xác nhận HỦY 1 phần món "${itemName}"? Nhập mã PIN Quản lý:`, async (pin) => {
+      if (pin !== "1234") {
+        showToast("Sai mã PIN Quản lý!", "error");
+        return;
+      }
+
+      try {
+        // Tìm giá tiền của món ăn đó trong danh sách thực đơn
+        const menu = await api.getMenuItems();
+        const menuItem = menu.find(m => m.name.toLowerCase() === itemName.toLowerCase());
+        if (!menuItem) {
+          showToast("Không tìm thấy giá món ăn để hoàn tiền!", "error");
+          return;
+        }
+        const itemPrice = parseFloat(menuItem.price);
+
+        // Cập nhật lại danh sách món và giá tiền
+        let updatedItems = [...items];
+        let priceToRefund = itemPrice;
+
+        if (qty > 1) {
+          // Giảm số lượng đi 1 phần
+          updatedItems[choiceIdx] = `${qty - 1}x ${itemName}`;
+        } else {
+          // Xóa hẳn món này ra khỏi danh sách
+          updatedItems.splice(choiceIdx, 1);
+        }
+
+        const newOrderDetails = updatedItems.join(', ');
+        
+        // Lấy đơn hàng hiện tại
+        const allActive = await api.getActiveOrders();
+        const currentOrder = allActive.find(o => o.id === orderId);
+        if (!currentOrder) return;
+
+        const newTotal = currentOrder.totalAmount - priceToRefund;
+
+        // Nếu là món cuối cùng của đơn hàng
+        if (updatedItems.length === 0) {
+          setReasonValue("Khách hủy toàn bộ");
+          setReasonCallback(() => async (reason) => {
+            try {
+              await api.deleteOrder(orderId);
+              showToast("Đã hủy đơn hàng thành công!");
+              loadData();
+            } catch (err) {
+              showToast("Lỗi hủy đơn hàng!", "error");
+            }
+          });
+          setShowReasonModal(true);
+          return;
+        }
+
+        // Cập nhật lại hóa đơn với lý do hủy
+        setReasonValue("Khách đổi ý / Đổi món");
+        setReasonCallback(() => async (reason) => {
+          try {
+            await api.updateOrder(orderId, {
+              orderDetails: newOrderDetails,
+              totalAmount: newTotal,
+              cancelledItemName: itemName,
+              cancelledQty: 1,
+              cancelledPrice: itemPrice,
+              reason: reason || "Khách hủy món lẻ"
+            });
+
+            showToast(`Đã giảm/hủy thành công 1 phần "${itemName}"!`);
+            loadData();
+          } catch (err) {
+            showToast("Lỗi xử lý hủy món lẻ!", "error");
+            console.error(err);
+          }
+        });
+        setShowReasonModal(true);
+
+      } catch (err) {
+        showToast("Lỗi xử lý hủy món lẻ!", "error");
+        console.error(err);
+      }
+    });
+  };
+
   // Xác nhận thanh toán
   const handleCheckout = async (table) => {
     const total = getTableTotal(table.id);
@@ -298,29 +384,48 @@ export default function CashierDashboard({ showToast }) {
                   💳 Hóa Đơn Chi Tiết — {selectedTable.name}
                 </h3>
 
-                {/* Danh sách món ăn */}
+                 {/* Danh sách món ăn chi tiết lẻ từng sản phẩm */}
                 <div style={{ maxHeight: '35vh', overflowY: 'auto', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {getTableOrders(selectedTable.id).map((order, idx) => (
-                    <div key={order.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px dotted var(--glass-border)', gap: '10px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{order.orderDetails}</div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                  {getTableOrders(selectedTable.id).flatMap((order) => {
+                    const items = order.orderDetails.split(',').map(s => s.trim()).filter(Boolean);
+                    return items.map((item, itemIdx) => {
+                      return {
+                        orderId: order.id,
+                        fullDetails: order.orderDetails,
+                        itemText: item,
+                        itemIdx: itemIdx,
+                        createdAt: order.createdAt
+                      };
+                    });
+                  }).map((parsedItem, idx) => {
+                    const match = parsedItem.itemText.match(/^(\d+)x\s+(.+)$/);
+                    const qty = match ? parseInt(match[1]) : 1;
+                    const itemName = match ? match[2].trim() : parsedItem.itemText;
+
+                    return (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px dotted var(--glass-border)', gap: '10px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                            <span style={{ color: '#fbbf24', marginRight: '6px' }}>{qty}x</span>
+                            {itemName}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            {new Date(parsedItem.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <button
+                            className="glass-button btn-danger"
+                            style={{ padding: '4px 8px', fontSize: '0.7rem', borderRadius: '6px', height: '26px', cursor: 'pointer' }}
+                            onClick={() => handleCancelSingleItem(parsedItem.orderId, parsedItem.fullDetails, parsedItem.itemIdx, itemName, qty)}
+                            title="Hủy món này"
+                          >
+                            🗑 Hủy
+                          </button>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <strong style={{ fontSize: '0.9rem', whiteSpace: 'nowrap' }}>{order.totalAmount.toLocaleString()} đ</strong>
-                        <button
-                          className="glass-button btn-danger"
-                          style={{ padding: '4px 8px', fontSize: '0.7rem', borderRadius: '4px', height: '24px' }}
-                          onClick={() => handleCancelOrder(order.id, order.orderDetails)}
-                          title="Hủy món ăn"
-                        >
-                          🗑 Hủy
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Form Tính Tiền */}
