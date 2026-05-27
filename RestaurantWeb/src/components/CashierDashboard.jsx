@@ -17,6 +17,14 @@ export default function CashierDashboard({ showToast }) {
   const [pinCallback, setPinCallback] = useState(null);
   const [pinModalTitle, setPinModalTitle] = useState("");
 
+  const [showItemSelectModal, setShowItemSelectModal] = useState(false);
+  const [itemsToSelect, setItemsToSelect] = useState([]);
+  const [selectItemCallback, setSelectItemCallback] = useState(null);
+
+  const [showReasonModal, setShowReasonModal] = useState(false);
+  const [reasonValue, setReasonValue] = useState("");
+  const [reasonCallback, setReasonCallback] = useState(null);
+
   const requestPin = (title, onConfirm) => {
     setPinModalTitle(title);
     setPinValue("");
@@ -92,92 +100,89 @@ export default function CashierDashboard({ showToast }) {
       return;
     }
 
-    // Nếu có nhiều món, chúng ta cho phép chọn món cụ thể để hủy lẻ
-    let promptMsg = `Hóa đơn này có nhiều món. Vui lòng chọn số thứ tự món muốn HỦY LẺ:\n`;
-    items.forEach((item, idx) => {
-      promptMsg += `${idx + 1}. ${item}\n`;
-    });
-    promptMsg += `Nhập số thứ tự cần hủy (1-${items.length}):`;
-
-    const choiceStr = window.prompt(promptMsg);
-    if (!choiceStr) return;
-
-    const choiceIdx = parseInt(choiceStr) - 1;
-    if (isNaN(choiceIdx) || choiceIdx < 0 || choiceIdx >= items.length) {
-      showToast("Lựa chọn không hợp lệ!", "error");
-      return;
-    }
-
-    const itemToCancel = items[choiceIdx];
-    
-    // Nhập mã PIN Quản lý để phê duyệt hủy món lẻ qua custom modal
-    requestPin(`Xác nhận HỦY món "${itemToCancel}"? Nhập mã PIN Quản lý:`, async (pin) => {
-      if (pin !== "1234") {
-        showToast("Sai mã PIN Quản lý!", "error");
-        return;
-      }
-
-      // Tiến hành tính toán giảm trừ giá tiền của món đó!
-      try {
-        const match = itemToCancel.match(/^(\d+)x\s+(.+)$/);
-        if (!match) {
-          showToast("Lỗi phân tích món ăn!", "error");
+    // Nếu có nhiều món, hiển thị custom modal để chọn món hủy lẻ trực quan
+    setItemsToSelect(items);
+    setSelectItemCallback(() => async (choiceIdx) => {
+      const itemToCancel = items[choiceIdx];
+      
+      // Nhập mã PIN Quản lý để phê duyệt hủy món lẻ qua custom modal
+      requestPin(`Xác nhận HỦY món "${itemToCancel}"? Nhập mã PIN Quản lý:`, async (pin) => {
+        if (pin !== "1234") {
+          showToast("Sai mã PIN Quản lý!", "error");
           return;
         }
 
-        const qty = parseInt(match[1]);
-        const itemName = match[2].trim();
+        // Tiến hành tính toán giảm trừ giá tiền của món đó!
+        try {
+          const match = itemToCancel.match(/^(\d+)x\s+(.+)$/);
+          if (!match) {
+            showToast("Lỗi phân tích món ăn!", "error");
+            return;
+          }
 
-        // Tìm giá tiền của món ăn đó trong danh sách thực đơn
-        const menu = await api.getMenuItems();
-        const menuItem = menu.find(m => m.name.toLowerCase() === itemName.toLowerCase());
-        if (!menuItem) {
-          showToast("Không tìm thấy giá món ăn để hoàn tiền!", "error");
-          return;
+          const qty = parseInt(match[1]);
+          const itemName = match[2].trim();
+
+          // Tìm giá tiền của món ăn đó trong danh sách thực đơn
+          const menu = await api.getMenuItems();
+          const menuItem = menu.find(m => m.name.toLowerCase() === itemName.toLowerCase());
+          if (!menuItem) {
+            showToast("Không tìm thấy giá món ăn để hoàn tiền!", "error");
+            return;
+          }
+          const itemPrice = parseFloat(menuItem.price);
+
+          // Cập nhật lại danh sách món và giá tiền
+          let updatedItems = [...items];
+          let priceToRefund = itemPrice;
+
+          if (qty > 1) {
+            // Giảm số lượng đi 1 phần
+            updatedItems[choiceIdx] = `${qty - 1}x ${itemName}`;
+          } else {
+            // Xóa hẳn món này ra khỏi danh sách
+            updatedItems.splice(choiceIdx, 1);
+          }
+
+          const newOrderDetails = updatedItems.join(', ');
+          
+          // Lấy đơn hàng hiện tại
+          const allActive = await api.getActiveOrders();
+          const currentOrder = allActive.find(o => o.id === orderId);
+          if (!currentOrder) return;
+
+          const newTotal = currentOrder.totalAmount - priceToRefund;
+
+          // Mở custom modal để nhập lý do hủy món thay thế cho window.prompt
+          setReasonValue("Khách đổi ý / Đổi món");
+          setReasonCallback(() => async (reason) => {
+            try {
+              // Gọi API cập nhật
+              await api.updateOrder(orderId, {
+                orderDetails: newOrderDetails,
+                totalAmount: newTotal,
+                cancelledItemName: itemName,
+                cancelledQty: 1,
+                cancelledPrice: itemPrice,
+                reason: reason || "Khách hủy món lẻ"
+              });
+
+              showToast(`Đã giảm/hủy thành công 1 phần "${itemName}"!`);
+              loadData();
+            } catch (err) {
+              showToast("Lỗi xử lý hủy món lẻ!", "error");
+              console.error(err);
+            }
+          });
+          setShowReasonModal(true);
+
+        } catch (err) {
+          showToast("Lỗi xử lý hủy món lẻ!", "error");
+          console.error(err);
         }
-        const itemPrice = parseFloat(menuItem.price);
-
-        // Cập nhật lại danh sách món và giá tiền
-        let updatedItems = [...items];
-        let priceToRefund = itemPrice;
-
-        if (qty > 1) {
-          // Giảm số lượng đi 1 phần
-          updatedItems[choiceIdx] = `${qty - 1}x ${itemName}`;
-        } else {
-          // Xóa hẳn món này ra khỏi danh sách
-          updatedItems.splice(choiceIdx, 1);
-        }
-
-        const newOrderDetails = updatedItems.join(', ');
-        
-        // Lấy đơn hàng hiện tại
-        const allActive = await api.getActiveOrders();
-        const currentOrder = allActive.find(o => o.id === orderId);
-        if (!currentOrder) return;
-
-        const newTotal = currentOrder.totalAmount - priceToRefund;
-
-        const reason = window.prompt("Nhập lý do hủy món:", "Khách đổi ý / Đổi món");
-        if (reason === null) return; // User cancelled prompt
-
-        // Gọi API cập nhật
-        await api.updateOrder(orderId, {
-          orderDetails: newOrderDetails,
-          totalAmount: newTotal,
-          cancelledItemName: itemName,
-          cancelledQty: 1,
-          cancelledPrice: itemPrice,
-          reason: reason || "Khách hủy món lẻ"
-        });
-
-        showToast(`Đã giảm/hủy thành công 1 phần "${itemName}"!`);
-        loadData();
-      } catch (err) {
-        showToast("Lỗi xử lý hủy món lẻ!", "error");
-        console.error(err);
-      }
+      });
     });
+    setShowItemSelectModal(true);
   };
 
   // Xác nhận thanh toán
@@ -591,6 +596,138 @@ export default function CashierDashboard({ showToast }) {
                   Xác Nhận
                 </button>
                 <button type="button" className="glass-button" style={{ flex: 1, padding: '10px' }} onClick={() => setShowPinModal(false)}>
+                  Hủy Bỏ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Chọn Món Để Hủy Lẻ Trực Quan */}
+      {showItemSelectModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '440px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: 800 }}>
+              📝 Chọn Món Muốn Hủy Lẻ
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem', textAlign: 'center' }}>
+              Đơn hàng này có nhiều món. Vui lòng bấm vào món ăn cần giảm số lượng hoặc hủy bỏ:
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '1.5rem', maxHeight: '40vh', overflowY: 'auto' }}>
+              {itemsToSelect.map((item, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setShowItemSelectModal(false);
+                    if (selectItemCallback) selectItemCallback(idx);
+                  }}
+                  className="glass-button table-row-hover"
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    textAlign: 'left',
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    borderRadius: '10px',
+                    border: '1px solid var(--glass-border)',
+                    background: 'rgba(255,255,255,0.03)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <span>{item}</span>
+                  <span style={{ color: 'var(--danger-color)', fontSize: '0.8rem', fontWeight: 700 }}>🗑 Hủy / Giảm</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowItemSelectModal(false)}
+              className="glass-button"
+              style={{ width: '100%', padding: '12px', cursor: 'pointer' }}
+            >
+              Hủy Thao Tác
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nhập Lý Do Hủy Món */}
+      {showReasonModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10001,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: 800 }}>
+              ✏️ Lý Do Hủy Món
+            </h3>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setShowReasonModal(false);
+              if (reasonCallback) reasonCallback(reasonValue);
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Nhập lý do hủy món:</label>
+                <input
+                  type="text"
+                  value={reasonValue}
+                  onChange={(e) => setReasonValue(e.target.value)}
+                  placeholder="Ví dụ: Khách đổi ý..."
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: '10px',
+                    padding: '12px',
+                    fontSize: '0.95rem',
+                    outline: 'none'
+                  }}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              {/* Suggestions */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {["Khách đổi ý / Đổi món", "Hết nguyên liệu", "Chờ lâu nên hủy", "Nhân viên bấm nhầm"].map((suggest, sIdx) => (
+                  <button
+                    key={sIdx}
+                    type="button"
+                    onClick={() => setReasonValue(suggest)}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      color: 'var(--text-secondary)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: '15px',
+                      padding: '4px 10px',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {suggest}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                <button type="submit" className="glass-button btn-success" style={{ flex: 1, padding: '10px', cursor: 'pointer' }}>
+                  Xác Nhận
+                </button>
+                <button type="button" className="glass-button" style={{ flex: 1, padding: '10px', cursor: 'pointer' }} onClick={() => setShowReasonModal(false)}>
                   Hủy Bỏ
                 </button>
               </div>
