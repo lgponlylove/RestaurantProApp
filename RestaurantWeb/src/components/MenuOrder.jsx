@@ -4,9 +4,35 @@ import { api, signalRService } from '../services/api';
 export default function MenuOrder({ table, onBack, cart, updateCart, clearCart, showToast }) {
   const [menuItems, setMenuItems] = useState([]);
 
+  const [orderedHistory, setOrderedHistory] = useState([]);
+
+  const loadOrderedHistory = () => {
+    api.getTableOrders(table.id).then(orders => {
+      setOrderedHistory(orders);
+    }).catch(err => console.error("Error loading table orders", err));
+  };
+
   useEffect(() => {
     api.getMenuItems().then(setMenuItems);
-  }, []);
+    loadOrderedHistory();
+
+    const handleNewOrder = () => loadOrderedHistory();
+    const handlePending = () => loadOrderedHistory();
+    const handleItemCooked = () => loadOrderedHistory();
+
+    signalRService.on("ReceiveNewOrder", handleNewOrder);
+    signalRService.on("ReceivePendingOrder", handlePending);
+    signalRService.on("ItemCooked", handleItemCooked);
+
+    const interval = setInterval(loadOrderedHistory, 3000);
+
+    return () => {
+      signalRService.off("ReceiveNewOrder", handleNewOrder);
+      signalRService.off("ReceivePendingOrder", handlePending);
+      signalRService.off("ItemCooked", handleItemCooked);
+      clearInterval(interval);
+    };
+  }, [table.id]);
 
   const normalizedCart = cart.map(i => ({
     ...i,
@@ -33,9 +59,10 @@ export default function MenuOrder({ table, onBack, cart, updateCart, clearCart, 
     updateCart(normalizedCart.filter(i => i.uniqueId !== uniqueId));
   };
 
-  const totalAmount = normalizedCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const newItemsAmount = normalizedCart.filter(i => i.status === 'new').reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const orderedAmount = orderedHistory.reduce((sum, o) => sum + o.totalAmount, 0);
+  const totalAmount = newItemsAmount + orderedAmount;
   const hasNewItems = normalizedCart.some(i => i.status === 'new');
-  const allCooked = normalizedCart.length > 0 && normalizedCart.every(i => i.status === 'cooked');
 
   const hotItems = menuItems.filter(i => i.isHot);
 
@@ -210,34 +237,32 @@ export default function MenuOrder({ table, onBack, cart, updateCart, clearCart, 
               <h3 style={{ fontSize: '0.85rem', color: 'var(--success-color)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', justifyContent: 'space-between' }}>
                 <span>📋 Món Đang Phục Vụ</span>
                 <span style={{ fontSize: '0.75rem', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                  {normalizedCart.filter(i => i.status !== 'new').length} món
+                  {orderedHistory.length} đơn
                 </span>
               </h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {normalizedCart.filter(i => i.status !== 'new').map(item => (
-                  <div key={item.uniqueId} style={{
+                {orderedHistory.map((order, idx) => (
+                  <div key={order.id || idx} style={{
                     display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
                     padding: '8px 10px', background: 'rgba(255,255,255,0.01)', border: '1px dotted rgba(255,255,255,0.1)', borderRadius: '8px'
                   }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>{item.quantity}x</span> {item.name}
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', color: order.isApproved ? '#fff' : 'rgba(255,255,255,0.6)' }}>
+                        {order.orderDetails}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                        <span style={{ fontSize: '0.75rem', fontStyle: 'italic', color: item.status === 'cooking' ? '#f97316' : 'var(--success-color)' }}>
-                          {item.status === 'cooking' ? '🔥 Đang nấu' : '✅ Đã nấu xong'}
+                        <span style={{ fontSize: '0.75rem', fontStyle: 'italic', color: order.isApproved ? 'var(--success-color)' : '#fbbf24' }}>
+                          {order.isApproved ? '✅ Đã nấu xong' : '⏳ Chờ duyệt...'}
                         </span>
-                        {item.addedAt && (
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                            🕐 {formatTime(item.addedAt)}
-                          </span>
-                        )}
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                          🕐 {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
                     </div>
                   </div>
                 ))}
-                {normalizedCart.filter(i => i.status !== 'new').length === 0 && (
+                {orderedHistory.length === 0 && (
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontStyle: 'italic', padding: '4px 0' }}>Chưa có món nào đang nấu</p>
                 )}
               </div>
