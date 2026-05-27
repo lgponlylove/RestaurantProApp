@@ -100,14 +100,37 @@ export default function CashierDashboard({ showToast }) {
       );
     };
 
+    const handleCheckoutRequest = ({ tableId, tableName }) => {
+      api.getTables().then(updatedTables => {
+        setTables(updatedTables);
+        const targetTable = updatedTables.find(t => t.id === tableId);
+        if (targetTable) {
+          // Tự động chuyển tab sang billing và chọn bàn ăn
+          setActiveTab("billing");
+          setSelectedTable(targetTable);
+          setPaymentMethod("Chuyển khoản"); // mặc định mở VietQR động
+        }
+      });
+
+      playPendingNotificationSound();
+      showToast(`💵 ${tableName} vừa yêu cầu THANH TOÁN!`, "success");
+      triggerDesktopNotification(
+        `🛎️ Yêu Cầu Thanh Toán - ${tableName}`,
+        `Khách hàng tại ${tableName} vừa yêu cầu thanh toán hóa đơn. Đang mở hóa đơn chi tiết!`
+      );
+    };
+
     signalRService.on("ReceiveNewOrder", handleNewOrder);
     signalRService.on("ReceivePendingOrder", handlePendingOrder);
+    signalRService.on("ReceiveCheckoutRequest", handleCheckoutRequest);
     signalRService.on("TableCheckedOut", handleCheckout);
 
     return () => {
       signalRService.off("ReceiveNewOrder", handleNewOrder);
       signalRService.off("ReceivePendingOrder", handlePendingOrder);
+      signalRService.off("ReceiveCheckoutRequest", handleCheckoutRequest);
       signalRService.off("TableCheckedOut", handleCheckout);
+
     };
   }, []);
 

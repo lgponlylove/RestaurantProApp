@@ -176,6 +176,10 @@ class SignalRService {
             this.emit("ReceivePendingOrder", { tableId, orderDetails, ticketId, totalAmount, orderId });
         });
 
+        this.connection.on("ReceiveCheckoutRequest", (tableId, tableName) => {
+            this.emit("ReceiveCheckoutRequest", { tableId, tableName });
+        });
+
         this.connection.on("ItemCooked", (ticketId, tableId) => {
             this.emit("ItemCooked", { ticketId, tableId });
         });
@@ -212,6 +216,12 @@ class SignalRService {
     async sendNewOrder(tableId, orderDetails, ticketId, totalAmount) {
         if (this.connection) {
             await this.connection.invoke("SendNewOrder", tableId, orderDetails, ticketId, totalAmount);
+        }
+    }
+
+    async requestCheckout(tableId) {
+        if (this.connection) {
+            await this.connection.invoke("RequestCheckout", tableId);
         }
     }
 

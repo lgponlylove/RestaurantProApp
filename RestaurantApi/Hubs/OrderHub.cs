@@ -48,8 +48,16 @@ namespace RestaurantApi.Hubs
         {
             await Clients.All.SendAsync("ItemCooked", ticketId, tableId);
         }
+
+        public async Task RequestCheckout(int tableId)
+        {
+            var table = await _db.Tables.FindAsync(tableId);
+            string tableName = table?.Name ?? $"Bàn {tableId}";
+            await Clients.All.SendAsync("ReceiveCheckoutRequest", tableId, tableName);
+        }
         
         public async Task CheckoutTable(int tableId, string paymentMethod)
+
         {
             var table = await _db.Tables.FindAsync(tableId);
             if (table != null)

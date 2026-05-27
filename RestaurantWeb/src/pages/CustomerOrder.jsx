@@ -99,6 +99,15 @@ export default function CustomerOrder() {
     }
   };
 
+  const handleRequestCheckout = async () => {
+    try {
+      await signalRService.requestCheckout(parseInt(tableId));
+      showToast('🛎️ Đã gửi yêu cầu thanh toán! Thu ngân đang chuẩn bị hóa đơn...');
+    } catch (err) {
+      showToast('Lỗi gửi yêu cầu thanh toán!', 'error');
+    }
+  };
+
   // ── KIỂM TRA BẢO MẬT: XÁC THỰC MÃ PHIÊN QR CODE ──
   if (!table) {
     return (
@@ -223,12 +232,35 @@ export default function CustomerOrder() {
                 </span>
               </div>
             ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.9rem', fontWeight: 700 }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.9rem', fontWeight: 700 }}>
               <span>Tổng cộng:</span>
               <span style={{ color: '#fbbf24' }}>
                 {orderedHistory.reduce((sum, o) => sum + o.totalAmount, 0).toLocaleString()} đ
               </span>
             </div>
+            
+            <button
+              className="glass-button"
+              style={{
+                width: '100%',
+                marginTop: '15px',
+                padding: '12px',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                boxShadow: '0 4px 15px rgba(16,185,129,0.3)',
+                fontSize: '0.9rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onClick={handleRequestCheckout}
+            >
+              🔔 Yêu Cầu Thanh Toán
+            </button>
           </div>
         </div>
       )}
