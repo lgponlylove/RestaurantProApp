@@ -34,7 +34,7 @@ namespace RestaurantApi.Hubs
                 TableName = tableName,
                 OrderDetails = orderDetails,
                 TotalAmount = totalAmount,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow.AddHours(7),
                 IsPaid = false
             };
             _db.Orders.Add(order);
@@ -81,7 +81,7 @@ namespace RestaurantApi.Hubs
                     TableName = table?.Name ?? $"Bàn {tableId}",
                     OrderDetails = string.Join("; ", details),
                     TotalAmount = totalBill,
-                    CreatedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow.AddHours(7),
                     PaymentMethod = string.IsNullOrEmpty(paymentMethod) ? "Tiền mặt" : paymentMethod
                 };
                 _db.Invoices.Add(invoice);

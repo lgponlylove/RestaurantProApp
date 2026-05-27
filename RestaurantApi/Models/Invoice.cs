@@ -9,7 +9,7 @@ namespace RestaurantApi.Models
         public string TableName { get; set; } = string.Empty;
         public string OrderDetails { get; set; } = string.Empty;
         public double TotalAmount { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow.AddHours(7);
         public string PaymentMethod { get; set; } = "Tiền mặt";
     }
 }

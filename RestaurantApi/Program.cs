@@ -65,7 +65,7 @@ app.MapPost("/api/orders", async (RestaurantDbContext db, IHubContext<OrderHub> 
         TableName = tableName,
         OrderDetails = dto.OrderDetails,
         TotalAmount = dto.TotalAmount,
-        CreatedAt = DateTime.UtcNow,
+        CreatedAt = DateTime.UtcNow.AddHours(7),
         IsPaid = false
     };
 
