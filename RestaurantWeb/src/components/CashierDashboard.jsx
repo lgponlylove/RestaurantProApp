@@ -2,6 +2,44 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import { api, signalRService } from '../services/api';
 
+const playPendingNotificationSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const playTone = (freq, duration, delay) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+      gain.gain.setValueAtTime(0.12, audioCtx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+      osc.start(audioCtx.currentTime + delay);
+      osc.stop(audioCtx.currentTime + delay + duration);
+    };
+    
+    // Âm thanh báo hiệu Ding-Dong-Ding cực hay
+    playTone(523.25, 0.3, 0);       // C5
+    playTone(659.25, 0.3, 0.15);    // E5
+    playTone(783.99, 0.5, 0.30);    // G5
+  } catch (e) {
+    console.error("Lỗi phát âm thanh báo hiệu:", e);
+  }
+};
+
+const triggerDesktopNotification = (title, body) => {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification(title, { body, icon: "/favicon.ico" });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(permission => {
+      if (permission === "granted") {
+        new Notification(title, { body, icon: "/favicon.ico" });
+      }
+    });
+  }
+};
+
 export default function CashierDashboard({ showToast }) {
   const [tables, setTables] = useState([]);
   const [activeOrders, setActiveOrders] = useState([]);
@@ -36,6 +74,11 @@ export default function CashierDashboard({ showToast }) {
   useEffect(() => {
     loadData();
 
+    // Xin quyền thông báo đẩy trình duyệt khi mở trang
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
     // Lắng nghe SignalR để cập nhật tức thời khi khách/nhân viên đặt món hoặc thanh toán
     signalRService.startConnection();
     
@@ -45,14 +88,29 @@ export default function CashierDashboard({ showToast }) {
       setSelectedTable(null);
     };
 
+    const handlePendingOrder = (tableId, orderDetails, ticketId, totalAmount, orderId) => {
+      loadData();
+      
+      // Phát âm thanh và thông báo
+      playPendingNotificationSound();
+      showToast(`🔔 Có yêu cầu gọi món mới chờ duyệt tại Bàn ${tableId}!`, "warning");
+      triggerDesktopNotification(
+        "🛎️ Yêu Cầu Gọi Món Mới Chờ Duyệt",
+        `Bàn số ${tableId} vừa gửi đơn gọi món mới và đang chờ bạn duyệt duyệt qua bếp!`
+      );
+    };
+
     signalRService.on("ReceiveNewOrder", handleNewOrder);
+    signalRService.on("ReceivePendingOrder", handlePendingOrder);
     signalRService.on("TableCheckedOut", handleCheckout);
 
     return () => {
       signalRService.off("ReceiveNewOrder", handleNewOrder);
+      signalRService.off("ReceivePendingOrder", handlePendingOrder);
       signalRService.off("TableCheckedOut", handleCheckout);
     };
   }, []);
+
 
   const loadData = () => {
     api.getTables().then(setTables);
@@ -378,7 +436,7 @@ export default function CashierDashboard({ showToast }) {
                   return (
                     <div
                       key={table.id}
-                      className="glass-panel"
+                      className={`glass-panel ${getPendingTableOrders(table.id).length > 0 ? 'pulse-pending' : ''}`}
                       onClick={() => handleSelectTable(table)}
                       style={{
                         cursor: 'pointer',
@@ -390,14 +448,24 @@ export default function CashierDashboard({ showToast }) {
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>{table.name}</span>
-                        <span style={{ background: 'var(--danger-color)', color: 'white', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '12px', fontWeight: 600 }}>
-                          Chờ thanh toán
-                        </span>
+                        {getPendingTableOrders(table.id).length > 0 ? (
+                          <span style={{ background: 'linear-gradient(135deg, #f97316, #ef4444)', color: 'white', fontSize: '0.72rem', padding: '4px 10px', borderRadius: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            ⏳ Chờ Duyệt
+                          </span>
+                        ) : (
+                          <span style={{ background: 'var(--danger-color)', color: 'white', fontSize: '0.75rem', padding: '3px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                            Chờ thanh toán
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                         Món đã gọi:
                         <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {getTableOrders(table.id).map(o => o.orderDetails).join(', ') || 'Chưa gọi món'}
+                          {getTableOrders(table.id).map(o => o.orderDetails).join(', ') || 
+                           (getPendingTableOrders(table.id).length > 0 ? 
+                            `📝 Chờ duyệt: ${getPendingTableOrders(table.id).map(o => o.orderDetails).join(', ')}` : 
+                            'Chưa gọi món'
+                           )}
                         </div>
                       </div>
                       <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '10px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -405,6 +473,7 @@ export default function CashierDashboard({ showToast }) {
                         <strong style={{ color: '#fbbf24', fontSize: '1.1rem' }}>{total.toLocaleString()} đ</strong>
                       </div>
                     </div>
+
                   );
                 })}
               </div>

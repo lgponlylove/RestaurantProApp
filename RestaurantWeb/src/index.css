@@ -231,6 +231,28 @@ body {
   animation: borderGlow 2s infinite ease-in-out;
 }
 
+.pulse-pending {
+  animation: pendingGlow 1.2s infinite ease-in-out !important;
+}
+
+@keyframes pendingGlow {
+  0% {
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.05);
+  }
+  50% {
+    border-color: rgba(239, 68, 68, 1);
+    box-shadow: 0 0 25px rgba(239, 68, 68, 0.8);
+    background: rgba(239, 68, 68, 0.15);
+  }
+  100% {
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.05);
+  }
+}
+
 @keyframes borderGlow {
   0% {
     border-top-color: #fbbf24;
@@ -249,3 +271,4 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
