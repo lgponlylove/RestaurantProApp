@@ -31,12 +31,17 @@ export default function CustomerOrder() {
     // Kết nối SignalR để đồng bộ tức thời khi thanh toán bàn
     signalRService.startConnection();
     
-    const handleCheckout = (tId) => {
+    const handleCheckout = ({ tableId: tId }) => {
       if (tId === parseInt(tableId)) {
         setOrderedHistory([]);
       }
     };
+
+    // Khi Thu ngân duyệt món → refresh lại lịch sử đặt món trên điện thoại ngay
+    const handleOrderUpdate = () => loadOrderedHistory();
+
     signalRService.on("TableCheckedOut", handleCheckout);
+    signalRService.on("ReceiveNewOrder", handleOrderUpdate);
 
     api.getTables().then(tables => {
       const found = tables.find(t => t.id === parseInt(tableId));
@@ -46,10 +51,11 @@ export default function CustomerOrder() {
     loadOrderedHistory();
 
     // Định kỳ quét lấy danh sách món để đảm bảo đồng bộ hoàn hảo
-    const interval = setInterval(loadOrderedHistory, 8000);
+    const interval = setInterval(loadOrderedHistory, 3000);
 
     return () => {
       signalRService.off("TableCheckedOut", handleCheckout);
+      signalRService.off("ReceiveNewOrder", handleOrderUpdate);
       clearInterval(interval);
     };
   }, [tableId]);
@@ -162,7 +168,10 @@ export default function CustomerOrder() {
           <button
             className="glass-button btn-success"
             style={{ padding: '14px 32px', fontSize: '1.05rem', fontWeight: 700, width: '100%' }}
-            onClick={() => setOrdered(false)}
+            onClick={() => {
+              setOrdered(false);
+              loadOrderedHistory(); // Refresh lại danh sách món đã đặt ngay khi quay về menu
+            }}
           >
             ➕ Tiếp Tục Xem Thực Đơn
           </button>

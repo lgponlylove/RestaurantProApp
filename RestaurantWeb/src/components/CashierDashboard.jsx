@@ -88,15 +88,15 @@ export default function CashierDashboard({ showToast }) {
       setSelectedTable(null);
     };
 
-    const handlePendingOrder = (tableId, orderDetails, ticketId, totalAmount, orderId) => {
+    const handlePendingOrder = ({ tableId, orderDetails }) => {
       loadData();
       
       // Phát âm thanh và thông báo
       playPendingNotificationSound();
-      showToast(`🔔 Có yêu cầu gọi món mới chờ duyệt tại Bàn ${tableId}!`, "warning");
+      showToast(`🔔 Yêu cầu gọi món mới chờ duyệt tại ${tableId}!`, "warning");
       triggerDesktopNotification(
         "🛎️ Yêu Cầu Gọi Món Mới Chờ Duyệt",
-        `Bàn số ${tableId} vừa gửi đơn gọi món mới và đang chờ bạn duyệt duyệt qua bếp!`
+        `Bàn số ${tableId} vừa gửi đơn gọi món mới và đang chờ bạn phê duyệt!`
       );
     };
 
