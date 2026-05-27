@@ -138,6 +138,18 @@ export const api = {
             headers: getHeaders()
         });
         return res.json();
+    },
+    transferTable: async (sourceTableId, targetTableId) => {
+        const res = await fetch(`${API_BASE_URL}/api/tables/transfer`, {
+            method: 'POST',
+            headers: getHeaders(true),
+            body: JSON.stringify({ sourceTableId, targetTableId })
+        });
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'Lỗi chuyển bàn');
+        }
+        return res.json();
     }
 };
 

@@ -369,6 +369,49 @@ app.MapPut("/api/tables/{id}/reset-token", async (RestaurantDbContext db, int id
     return Results.Ok(table);
 }).RequireAuthorization();
 
+app.MapPost("/api/tables/transfer", async (RestaurantDbContext db, IHubContext<OrderHub> hubContext, TransferRequest dto) =>
+{
+    var sourceTable = await db.Tables.FindAsync(dto.SourceTableId);
+    var targetTable = await db.Tables.FindAsync(dto.TargetTableId);
+
+    if (sourceTable == null || targetTable == null)
+    {
+        return Results.BadRequest(new { message = "Không tìm thấy bàn nguồn hoặc bàn đích!" });
+    }
+
+    // Lấy toàn bộ đơn hàng chưa thanh toán của bàn nguồn
+    var sourceOrders = await db.Orders
+        .Where(o => o.TableId == dto.SourceTableId && !o.IsPaid)
+        .ToListAsync();
+
+    if (!sourceOrders.Any())
+    {
+        return Results.BadRequest(new { message = "Bàn nguồn hiện không có đơn hàng nào chưa thanh toán!" });
+    }
+
+    // Chuyển toàn bộ orders sang bàn đích
+    foreach (var order in sourceOrders)
+    {
+        order.TableId = dto.TargetTableId;
+        order.TableName = targetTable.Name;
+    }
+
+    // Cập nhật trạng thái của 2 bàn
+    sourceTable.IsOccupied = false;
+    targetTable.IsOccupied = true;
+
+    // Làm mới Session Token của bàn nguồn để khách cũ không đặt đơn vào bàn này nữa
+    sourceTable.CurrentSessionToken = Guid.NewGuid().ToString("N").Substring(0, 8);
+
+    await db.SaveChangesAsync();
+
+    // Phát SignalR thông báo cho toàn bộ các thiết bị làm mới bàn ăn tức thời
+    await hubContext.Clients.All.SendAsync("TableCheckedOut", dto.SourceTableId);
+    await hubContext.Clients.All.SendAsync("TableCheckedOut", dto.TargetTableId);
+
+    return Results.Ok(new { message = "Chuyển bàn/gộp bàn thành công!", targetTableId = dto.TargetTableId });
+}).RequireAuthorization();
+
 // ── Thống Kê Doanh Thu ───────────────────────────────────────────────
 app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
 {
@@ -421,3 +464,4 @@ app.Run($"http://0.0.0.0:{port}");
 public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount, bool? IsApproved = null, string? Token = null);
 public record UpdateOrderDto(string OrderDetails, double TotalAmount, string? CancelledItemName = null, int CancelledQty = 0, double CancelledPrice = 0, string? Reason = null);
 public record LoginDto(string Username, string Password);
+public record TransferRequest(int SourceTableId, int TargetTableId);

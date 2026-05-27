@@ -12,6 +12,7 @@ export default function CashierDashboard({ showToast }) {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState(null);
   const [activeTab, setActiveTab] = useState("billing"); // billing hoặc history
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinValue, setPinValue] = useState("");
   const [pinCallback, setPinCallback] = useState(null);
@@ -89,6 +90,23 @@ export default function CashierDashboard({ showToast }) {
       loadData();
     } catch (err) {
       showToast("Lỗi khi phê duyệt đơn hàng!", "error");
+    }
+  };
+
+  const handleTransferTable = async (targetTableId) => {
+    if (!selectedTable) return;
+    try {
+      const res = await api.transferTable(selectedTable.id, targetTableId);
+      showToast(res.message || "Đã chuyển/gộp bàn thành công!");
+      
+      // Cập nhật bàn hoạt động sang bàn mới để kiểm tra hóa đơn lập tức
+      const targetTable = tables.find(t => t.id === targetTableId);
+      setSelectedTable(targetTable || null);
+      
+      setShowTransferModal(false);
+      loadData();
+    } catch (err) {
+      showToast(err.message || "Lỗi khi chuyển/gộp bàn!", "error");
     }
   };
 
@@ -533,21 +551,30 @@ export default function CashierDashboard({ showToast }) {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                  <button
-                    className="glass-button btn-success"
-                    style={{ flex: 1, padding: '12px', fontSize: '0.95rem', fontWeight: 700 }}
-                    onClick={() => handleCheckout(selectedTable)}
-                  >
-                    🍳 Thanh Toán & In
-                  </button>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem', flexDirection: 'column' }}>
                   <button
                     className="glass-button"
-                    style={{ flex: 0.5 }}
-                    onClick={() => setSelectedTable(null)}
+                    style={{ width: '100%', padding: '10px', fontSize: '0.9rem', fontWeight: 700, borderColor: '#fbbf24', color: '#fbbf24' }}
+                    onClick={() => setShowTransferModal(true)}
                   >
-                    Hủy
+                    🔄 Chuyển / Gộp Bàn
                   </button>
+                  <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                    <button
+                      className="glass-button btn-success"
+                      style={{ flex: 1, padding: '12px', fontSize: '0.95rem', fontWeight: 700 }}
+                      onClick={() => handleCheckout(selectedTable)}
+                    >
+                      🍳 Thanh Toán & In
+                    </button>
+                    <button
+                      className="glass-button"
+                      style={{ flex: 0.5 }}
+                      onClick={() => setSelectedTable(null)}
+                    >
+                      Đóng
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -898,6 +925,70 @@ export default function CashierDashboard({ showToast }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Chuyển / Gộp Bàn */}
+      {showTransferModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10001,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '420px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', textAlign: 'center', color: 'var(--text-primary)', fontWeight: 800 }}>
+              🔄 Chuyển / Gộp Bàn Ăn
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+              Di chuyển hóa đơn của <strong>{selectedTable?.name}</strong> sang bàn khác.
+            </p>
+
+            <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
+              {tables.filter(t => t.id !== selectedTable?.id).map((t) => {
+                const targetOrders = activeOrders.filter(o => o.tableId === t.id && o.isApproved);
+                const isTargetOccupied = t.isOccupied || targetOrders.length > 0;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => handleTransferTable(t.id)}
+                    style={{
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: '10px',
+                      padding: '12px 15px',
+                      color: 'var(--text-primary)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      textAlign: 'left',
+                      width: '100%'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.transform = 'none'; }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: '0.9rem' }}>{t.name}</strong>
+                      {t.type === 'VIP' && <span style={{ fontSize: '0.7rem', color: '#f87171', marginLeft: '6px', background: 'rgba(239, 68, 68, 0.1)', padding: '1px 5px', borderRadius: '4px' }}>💎 VIP</span>}
+                    </div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isTargetOccupied ? '#f87171' : 'var(--success-color)' }}>
+                      {isTargetOccupied ? '🔴 Gộp Hóa Đơn' : '🟢 Chuyển Sang'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              className="glass-button"
+              style={{ width: '100%', padding: '12px', fontWeight: 700 }}
+              onClick={() => setShowTransferModal(false)}
+            >
+              ✕ Đóng Cửa Sổ
+            </button>
           </div>
         </div>
       )}
