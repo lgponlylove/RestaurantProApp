@@ -49,6 +49,12 @@ export const api = {
         });
         return res.json();
     },
+    deleteOrder: async (id) => {
+        const res = await fetch(`${API_BASE_URL}/api/orders/${id}`, {
+            method: 'DELETE'
+        });
+        return res.json();
+    },
     getRevenueStats: async () => {
         const res = await fetch(`${API_BASE_URL}/api/stats/revenue`);
         return res.json();

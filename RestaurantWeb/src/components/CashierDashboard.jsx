@@ -58,6 +58,21 @@ export default function CashierDashboard({ showToast }) {
     setPaymentMethod("Tiền mặt");
   };
 
+  const handleCancelOrder = async (orderId, orderDetails) => {
+    const pin = window.prompt(`Bạn có chắc chắn muốn hủy đơn "${orderDetails}"? Vui lòng nhập mã PIN Quản lý để xác nhận:`);
+    if (pin === "1234") {
+      try {
+        await api.deleteOrder(orderId);
+        showToast("Đã hủy món ăn thành công!");
+        loadData();
+      } catch (err) {
+        showToast("Lỗi hủy món ăn!", "error");
+      }
+    } else if (pin !== null) {
+      showToast("Sai mã PIN Quản lý!", "error");
+    }
+  };
+
   // Xác nhận thanh toán
   const handleCheckout = async (table) => {
     const total = getTableTotal(table.id);
@@ -174,14 +189,24 @@ export default function CashierDashboard({ showToast }) {
                 {/* Danh sách món ăn */}
                 <div style={{ maxHeight: '35vh', overflowY: 'auto', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {getTableOrders(selectedTable.id).map((order, idx) => (
-                    <div key={order.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: '8px', borderBottom: '1px dotted var(--glass-border)' }}>
+                    <div key={order.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px dotted var(--glass-border)', gap: '10px' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{order.orderDetails}</div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                           {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <strong style={{ fontSize: '0.9rem' }}>{order.totalAmount.toLocaleString()} đ</strong>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <strong style={{ fontSize: '0.9rem', whiteSpace: 'nowrap' }}>{order.totalAmount.toLocaleString()} đ</strong>
+                        <button
+                          className="glass-button btn-danger"
+                          style={{ padding: '4px 8px', fontSize: '0.7rem', borderRadius: '4px', height: '24px' }}
+                          onClick={() => handleCancelOrder(order.id, order.orderDetails)}
+                          title="Hủy món ăn"
+                        >
+                          🗑 Hủy
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

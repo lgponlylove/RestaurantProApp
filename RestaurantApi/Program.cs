@@ -78,6 +78,34 @@ app.MapPost("/api/orders", async (RestaurantDbContext db, IHubContext<OrderHub> 
     return Results.Ok(order);
 });
 
+// ── Hủy Một Đơn Hàng Cụ Thể (Yêu cầu quyền Quản lý/Thu ngân) ─────────
+app.MapDelete("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<OrderHub> hubContext, int id) =>
+{
+    var order = await db.Orders.FindAsync(id);
+    if (order == null) return Results.NotFound();
+
+    int tableId = order.TableId;
+    db.Orders.Remove(order);
+    
+    // Nếu đây là đơn hàng cuối cùng của bàn, đánh dấu bàn là Trống
+    var remainingOrders = await db.Orders.CountAsync(o => o.TableId == tableId && !o.IsPaid && o.Id != id);
+    if (remainingOrders == 0)
+    {
+        var table = await db.Tables.FindAsync(tableId);
+        if (table != null)
+        {
+            table.IsOccupied = false;
+        }
+    }
+
+    await db.SaveChangesAsync();
+
+    // Phát SignalR để tất cả thiết bị (Bếp, Khách 4G, Phục vụ) đồng bộ lại ngay
+    await hubContext.Clients.All.SendAsync("TableCheckedOut", tableId);
+
+    return Results.Ok(new { message = "Đã hủy món thành công" });
+});
+
 // ── Thu Ngân APIs ────────────────────────────────────────────────────
 app.MapGet("/api/orders/active", async (RestaurantDbContext db) =>
     await db.Orders.Where(o => !o.IsPaid).ToListAsync());
