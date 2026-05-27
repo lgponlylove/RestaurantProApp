@@ -289,6 +289,10 @@ app.MapPut("/api/orders/{id}/approve", async (RestaurantDbContext db, IHubContex
 app.MapGet("/api/orders/active", async (RestaurantDbContext db) =>
     await db.Orders.Where(o => !o.IsPaid).ToListAsync()).RequireAuthorization();
 
+// ── Endpoint công khai: Khách xem lại món đã gọi theo bàn (không cần JWT) ──
+app.MapGet("/api/orders/table/{tableId}", async (RestaurantDbContext db, int tableId) =>
+    await db.Orders.Where(o => o.TableId == tableId && !o.IsPaid).ToListAsync());
+
 app.MapGet("/api/invoices", async (RestaurantDbContext db) =>
     await db.Invoices.OrderByDescending(i => i.CreatedAt).ToListAsync()).RequireAuthorization();
 

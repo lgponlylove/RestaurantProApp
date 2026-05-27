@@ -22,9 +22,8 @@ export default function CustomerOrder() {
   };
 
   const loadOrderedHistory = () => {
-    api.getActiveOrders().then(orders => {
-      const tableOrders = orders.filter(o => o.tableId === parseInt(tableId));
-      setOrderedHistory(tableOrders);
+    api.getTableOrders(tableId).then(orders => {
+      setOrderedHistory(orders);
     });
   };
 

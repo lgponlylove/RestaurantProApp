@@ -68,6 +68,11 @@ export const api = {
         });
         return res.json();
     },
+    // Endpoint công khai: Khách xem món đã gọi theo bàn (không cần đăng nhập)
+    getTableOrders: async (tableId) => {
+        const res = await fetch(`${API_BASE_URL}/api/orders/table/${tableId}`);
+        return res.json();
+    },
     getInvoices: async () => {
         const res = await fetch(`${API_BASE_URL}/api/invoices`, {
             headers: getHeaders()
