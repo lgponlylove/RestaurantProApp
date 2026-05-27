@@ -146,10 +146,17 @@ export default function CashierDashboard({ showToast }) {
 
       const newTotal = currentOrder.totalAmount - priceToRefund;
 
+      const reason = window.prompt("Nhập lý do hủy món:", "Khách đổi ý / Đổi món");
+      if (reason === null) return; // User cancelled prompt
+
       // Gọi API cập nhật
       await api.updateOrder(orderId, {
         orderDetails: newOrderDetails,
-        totalAmount: newTotal
+        totalAmount: newTotal,
+        cancelledItemName: itemName,
+        cancelledQty: 1,
+        cancelledPrice: itemPrice,
+        reason: reason || "Khách hủy món lẻ"
       });
 
       showToast(`Đã giảm/hủy thành công 1 phần "${itemName}"!`);

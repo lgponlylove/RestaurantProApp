@@ -4,7 +4,8 @@ import { api } from '../services/api';
 export default function ManagerDashboard({ showToast }) {
   const [menuItems, setMenuItems] = useState([]);
   const [stats, setStats] = useState({ totalRevenue: 0, totalInvoices: 0, bestSellers: [] });
-  const [activeSubTab, setActiveSubTab] = useState("menu"); // menu hoặc stats
+  const [activeSubTab, setActiveSubTab] = useState("menu"); // menu, stats hoặc cancelled
+  const [cancelledOrders, setCancelledOrders] = useState([]);
   
   // Trạng thái Form thêm/sửa món
   const [showFormModal, setShowFormModal] = useState(false);
@@ -20,7 +21,14 @@ export default function ManagerDashboard({ showToast }) {
   useEffect(() => {
     loadMenu();
     loadStats();
+    loadCancelledOrders();
   }, []);
+
+  const loadCancelledOrders = () => {
+    api.getCancelledOrders()
+      .then(setCancelledOrders)
+      .catch(err => console.error("Lỗi tải nhật ký hủy:", err));
+  };
 
   const loadMenu = () => {
     api.getMenuItems().then(setMenuItems);
@@ -124,6 +132,13 @@ export default function ManagerDashboard({ showToast }) {
           style={{ borderColor: activeSubTab === 'stats' ? 'var(--success-color)' : '' }}
         >
           📈 Thống Kê Doanh Thu
+        </button>
+        <button
+          className="glass-button"
+          onClick={() => { setActiveSubTab("cancelled"); loadCancelledOrders(); }}
+          style={{ borderColor: activeSubTab === 'cancelled' ? 'var(--danger-color)' : '' }}
+        >
+          🚨 Nhật Ký Hủy Món
         </button>
       </div>
 
@@ -328,6 +343,62 @@ export default function ManagerDashboard({ showToast }) {
             </div>
 
           </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 3: NHẬT KÝ HỦY MÓN */}
+      {activeSubTab === "cancelled" && (
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem' }}>🚨 Nhật Ký Hủy Món (Security Audit Log)</h3>
+            <button className="glass-button" onClick={loadCancelledOrders}>
+              🔄 Làm mới
+            </button>
+          </div>
+
+          {cancelledOrders.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛡️</div>
+              Chưa có lịch sử hủy món nào được ghi nhận. Hệ thống đang bảo mật tốt!
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
+                    <th style={{ padding: '12px' }}>Thời Gian</th>
+                    <th style={{ padding: '12px' }}>Bàn</th>
+                    <th style={{ padding: '12px' }}>Tên Món Hủy</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Số Lượng</th>
+                    <th style={{ padding: '12px', textAlign: 'right' }}>Đơn Giá</th>
+                    <th style={{ padding: '12px', textAlign: 'right' }}>Hoàn Tiền</th>
+                    <th style={{ padding: '12px' }}>Lý Do Hủy Món</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cancelledOrders.map(item => (
+                    <tr key={item.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                      <td style={{ padding: '12px', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                        {new Date(item.cancelledAt).toLocaleString('vi-VN')}
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: 700 }}>{item.tableName}</td>
+                      <td style={{ padding: '12px', fontWeight: 600, color: '#f87171' }}>{item.itemName}</td>
+                      <td style={{ padding: '12px', textAlign: 'center', fontWeight: 700 }}>{item.quantity}</td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        {item.price.toLocaleString()} đ
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right', fontWeight: 700, color: '#ef4444' }}>
+                        {(item.quantity * item.price).toLocaleString()} đ
+                      </td>
+                      <td style={{ padding: '12px', fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        {item.reason}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

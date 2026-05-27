@@ -66,6 +66,10 @@ export const api = {
     getRevenueStats: async () => {
         const res = await fetch(`${API_BASE_URL}/api/stats/revenue`);
         return res.json();
+    },
+    getCancelledOrders: async () => {
+        const res = await fetch(`${API_BASE_URL}/api/cancelled-orders`);
+        return res.json();
     }
 };
 

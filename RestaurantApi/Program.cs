@@ -85,6 +85,37 @@ app.MapDelete("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<Ord
     if (order == null) return Results.NotFound();
 
     int tableId = order.TableId;
+
+    // Phân tách các món hủy để lưu nhật ký chống gian lận
+    var parts = order.OrderDetails.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries);
+    foreach (var part in parts)
+    {
+        var cleanPart = part.Trim();
+        var xIndex = cleanPart.IndexOf('x');
+        if (xIndex > 0)
+        {
+            var qtyStr = cleanPart.Substring(0, xIndex).Trim();
+            var nameStr = cleanPart.Substring(xIndex + 1).Trim();
+            if (int.TryParse(qtyStr, out int qty))
+            {
+                var menuItem = await db.MenuItems.FirstOrDefaultAsync(m => m.Name.ToLower() == nameStr.ToLower());
+                double price = menuItem != null ? (double)menuItem.Price : 0;
+
+                var cancelledLog = new CancelledOrder
+                {
+                    TableId = order.TableId,
+                    TableName = order.TableName,
+                    ItemName = nameStr,
+                    Quantity = qty,
+                    Price = price,
+                    CancelledAt = DateTime.UtcNow.AddHours(7),
+                    Reason = "Hủy toàn bộ đơn hàng"
+                };
+                db.CancelledOrders.Add(cancelledLog);
+            }
+        }
+    }
+
     db.Orders.Remove(order);
     
     // Nếu đây là đơn hàng cuối cùng của bàn, đánh dấu bàn là Trống
@@ -115,6 +146,22 @@ app.MapPut("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<OrderH
     int tableId = order.TableId;
     order.OrderDetails = dto.OrderDetails;
     order.TotalAmount = dto.TotalAmount;
+
+    // Lưu nhật ký hủy món lẻ nếu có
+    if (!string.IsNullOrEmpty(dto.CancelledItemName) && dto.CancelledQty > 0)
+    {
+        var cancelledLog = new CancelledOrder
+        {
+            TableId = tableId,
+            TableName = order.TableName,
+            ItemName = dto.CancelledItemName,
+            Quantity = dto.CancelledQty,
+            Price = dto.CancelledPrice,
+            CancelledAt = DateTime.UtcNow.AddHours(7),
+            Reason = string.IsNullOrEmpty(dto.Reason) ? "Khách hủy món lẻ" : dto.Reason
+        };
+        db.CancelledOrders.Add(cancelledLog);
+    }
 
     // Nếu không còn món nào trong hóa đơn chi tiết, xóa luôn đơn hàng khỏi DB
     if (string.IsNullOrWhiteSpace(order.OrderDetails))
@@ -147,6 +194,10 @@ app.MapGet("/api/orders/active", async (RestaurantDbContext db) =>
 
 app.MapGet("/api/invoices", async (RestaurantDbContext db) =>
     await db.Invoices.OrderByDescending(i => i.CreatedAt).ToListAsync());
+
+// ── Nhật Ký Hủy Món (Security Audit Log) ─────────────────────────────
+app.MapGet("/api/cancelled-orders", async (RestaurantDbContext db) =>
+    await db.CancelledOrders.OrderByDescending(c => c.CancelledAt).ToListAsync());
 
 // ── Quản Lý Thực Đơn CRUD ────────────────────────────────────────────
 app.MapPost("/api/menu", async (RestaurantDbContext db, MenuItem item) =>
@@ -231,4 +282,4 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "5296";
 app.Run($"http://0.0.0.0:{port}");
 
 public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount);
-public record UpdateOrderDto(string OrderDetails, double TotalAmount);
+public record UpdateOrderDto(string OrderDetails, double TotalAmount, string? CancelledItemName = null, int CancelledQty = 0, double CancelledPrice = 0, string? Reason = null);

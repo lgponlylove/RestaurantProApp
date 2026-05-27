@@ -11,6 +11,7 @@ namespace RestaurantApi.Data
         public DbSet<MenuItem> MenuItems { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
+        public DbSet<CancelledOrder> CancelledOrders { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
