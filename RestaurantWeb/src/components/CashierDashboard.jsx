@@ -12,6 +12,17 @@ export default function CashierDashboard({ showToast }) {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [currentReceipt, setCurrentReceipt] = useState(null);
   const [activeTab, setActiveTab] = useState("billing"); // billing hoặc history
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinValue, setPinValue] = useState("");
+  const [pinCallback, setPinCallback] = useState(null);
+  const [pinModalTitle, setPinModalTitle] = useState("");
+
+  const requestPin = (title, onConfirm) => {
+    setPinModalTitle(title);
+    setPinValue("");
+    setPinCallback(() => onConfirm);
+    setShowPinModal(true);
+  };
 
   useEffect(() => {
     loadData();
@@ -65,18 +76,19 @@ export default function CashierDashboard({ showToast }) {
     
     if (items.length <= 1) {
       // Nếu chỉ có 1 món duy nhất trong đơn hàng, tiến hành hủy toàn bộ đơn hàng
-      const pin = window.prompt(`Bạn có chắc chắn muốn hủy món "${orderDetails}"? Vui lòng nhập mã PIN Quản lý:`);
-      if (pin === "1234") {
-        try {
-          await api.deleteOrder(orderId);
-          showToast("Đã hủy món ăn thành công!");
-          loadData();
-        } catch (err) {
-          showToast("Lỗi hủy món ăn!", "error");
+      requestPin(`Bạn có chắc chắn muốn hủy món "${orderDetails}"? Nhập mã PIN Quản lý:`, async (pin) => {
+        if (pin === "1234") {
+          try {
+            await api.deleteOrder(orderId);
+            showToast("Đã hủy món ăn thành công!");
+            loadData();
+          } catch (err) {
+            showToast("Lỗi hủy món ăn!", "error");
+          }
+        } else {
+          showToast("Sai mã PIN Quản lý!", "error");
         }
-      } else if (pin !== null) {
-        showToast("Sai mã PIN Quản lý!", "error");
-      }
+      });
       return;
     }
 
@@ -98,73 +110,74 @@ export default function CashierDashboard({ showToast }) {
 
     const itemToCancel = items[choiceIdx];
     
-    // Nhập mã PIN Quản lý để phê duyệt hủy món lẻ
-    const pin = window.prompt(`Xác nhận HỦY món "${itemToCancel}"? Vui lòng nhập mã PIN Quản lý:`);
-    if (pin !== "1234") {
-      if (pin !== null) showToast("Sai mã PIN Quản lý!", "error");
-      return;
-    }
-
-    // Tiến hành tính toán giảm trừ giá tiền của món đó!
-    try {
-      const match = itemToCancel.match(/^(\d+)x\s+(.+)$/);
-      if (!match) {
-        showToast("Lỗi phân tích món ăn!", "error");
+    // Nhập mã PIN Quản lý để phê duyệt hủy món lẻ qua custom modal
+    requestPin(`Xác nhận HỦY món "${itemToCancel}"? Nhập mã PIN Quản lý:`, async (pin) => {
+      if (pin !== "1234") {
+        showToast("Sai mã PIN Quản lý!", "error");
         return;
       }
 
-      const qty = parseInt(match[1]);
-      const itemName = match[2].trim();
+      // Tiến hành tính toán giảm trừ giá tiền của món đó!
+      try {
+        const match = itemToCancel.match(/^(\d+)x\s+(.+)$/);
+        if (!match) {
+          showToast("Lỗi phân tích món ăn!", "error");
+          return;
+        }
 
-      // Tìm giá tiền của món ăn đó trong danh sách thực đơn
-      const menu = await api.getMenuItems();
-      const menuItem = menu.find(m => m.name.toLowerCase() === itemName.toLowerCase());
-      if (!menuItem) {
-        showToast("Không tìm thấy giá món ăn để hoàn tiền!", "error");
-        return;
+        const qty = parseInt(match[1]);
+        const itemName = match[2].trim();
+
+        // Tìm giá tiền của món ăn đó trong danh sách thực đơn
+        const menu = await api.getMenuItems();
+        const menuItem = menu.find(m => m.name.toLowerCase() === itemName.toLowerCase());
+        if (!menuItem) {
+          showToast("Không tìm thấy giá món ăn để hoàn tiền!", "error");
+          return;
+        }
+        const itemPrice = parseFloat(menuItem.price);
+
+        // Cập nhật lại danh sách món và giá tiền
+        let updatedItems = [...items];
+        let priceToRefund = itemPrice;
+
+        if (qty > 1) {
+          // Giảm số lượng đi 1 phần
+          updatedItems[choiceIdx] = `${qty - 1}x ${itemName}`;
+        } else {
+          // Xóa hẳn món này ra khỏi danh sách
+          updatedItems.splice(choiceIdx, 1);
+        }
+
+        const newOrderDetails = updatedItems.join(', ');
+        
+        // Lấy đơn hàng hiện tại
+        const allActive = await api.getActiveOrders();
+        const currentOrder = allActive.find(o => o.id === orderId);
+        if (!currentOrder) return;
+
+        const newTotal = currentOrder.totalAmount - priceToRefund;
+
+        const reason = window.prompt("Nhập lý do hủy món:", "Khách đổi ý / Đổi món");
+        if (reason === null) return; // User cancelled prompt
+
+        // Gọi API cập nhật
+        await api.updateOrder(orderId, {
+          orderDetails: newOrderDetails,
+          totalAmount: newTotal,
+          cancelledItemName: itemName,
+          cancelledQty: 1,
+          cancelledPrice: itemPrice,
+          reason: reason || "Khách hủy món lẻ"
+        });
+
+        showToast(`Đã giảm/hủy thành công 1 phần "${itemName}"!`);
+        loadData();
+      } catch (err) {
+        showToast("Lỗi xử lý hủy món lẻ!", "error");
+        console.error(err);
       }
-      const itemPrice = parseFloat(menuItem.price);
-
-      // Cập nhật lại danh sách món và giá tiền
-      let updatedItems = [...items];
-      let priceToRefund = itemPrice;
-
-      if (qty > 1) {
-        // Giảm số lượng đi 1 phần
-        updatedItems[choiceIdx] = `${qty - 1}x ${itemName}`;
-      } else {
-        // Xóa hẳn món này ra khỏi danh sách
-        updatedItems.splice(choiceIdx, 1);
-      }
-
-      const newOrderDetails = updatedItems.join(', ');
-      
-      // Lấy đơn hàng hiện tại
-      const allActive = await api.getActiveOrders();
-      const currentOrder = allActive.find(o => o.id === orderId);
-      if (!currentOrder) return;
-
-      const newTotal = currentOrder.totalAmount - priceToRefund;
-
-      const reason = window.prompt("Nhập lý do hủy món:", "Khách đổi ý / Đổi món");
-      if (reason === null) return; // User cancelled prompt
-
-      // Gọi API cập nhật
-      await api.updateOrder(orderId, {
-        orderDetails: newOrderDetails,
-        totalAmount: newTotal,
-        cancelledItemName: itemName,
-        cancelledQty: 1,
-        cancelledPrice: itemPrice,
-        reason: reason || "Khách hủy món lẻ"
-      });
-
-      showToast(`Đã giảm/hủy thành công 1 phần "${itemName}"!`);
-      loadData();
-    } catch (err) {
-      showToast("Lỗi xử lý hủy món lẻ!", "error");
-      console.error(err);
-    }
+    });
   };
 
   // Xác nhận thanh toán
@@ -530,6 +543,58 @@ export default function CashierDashboard({ showToast }) {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up Nhập PIN Bảo Mật Cực Đẹp */}
+      {showPinModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '380px', padding: '2rem', textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🔒</div>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>Xác Thực Quản Lý</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>{pinModalTitle}</p>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setShowPinModal(false);
+              if (pinCallback) pinCallback(pinValue);
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <input
+                type="password"
+                value={pinValue}
+                onChange={(e) => setPinValue(e.target.value)}
+                placeholder="••••"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--glass-border)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontSize: '2rem',
+                  letterSpacing: '0.5rem',
+                  textAlign: 'center',
+                  outline: 'none',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+                }}
+                autoFocus
+                required
+              />
+              
+              <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                <button type="submit" className="glass-button btn-success" style={{ flex: 1, padding: '10px' }}>
+                  Xác Nhận
+                </button>
+                <button type="button" className="glass-button" style={{ flex: 1, padding: '10px' }} onClick={() => setShowPinModal(false)}>
+                  Hủy Bỏ
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
