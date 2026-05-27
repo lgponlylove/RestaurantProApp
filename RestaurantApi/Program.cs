@@ -106,6 +106,41 @@ app.MapDelete("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<Ord
     return Results.Ok(new { message = "Đã hủy món thành công" });
 });
 
+// ── Cập Nhật Chi Tiết Đơn Hàng (Cho phép Hủy từng món lẻ) ─────────────
+app.MapPut("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<OrderHub> hubContext, int id, UpdateOrderDto dto) =>
+{
+    var order = await db.Orders.FindAsync(id);
+    if (order == null) return Results.NotFound();
+
+    int tableId = order.TableId;
+    order.OrderDetails = dto.OrderDetails;
+    order.TotalAmount = dto.TotalAmount;
+
+    // Nếu không còn món nào trong hóa đơn chi tiết, xóa luôn đơn hàng khỏi DB
+    if (string.IsNullOrWhiteSpace(order.OrderDetails))
+    {
+        db.Orders.Remove(order);
+        
+        // Kiểm tra xem đây có phải đơn cuối cùng của bàn không
+        var remainingOrders = await db.Orders.CountAsync(o => o.TableId == tableId && !o.IsPaid && o.Id != id);
+        if (remainingOrders == 0)
+        {
+            var table = await db.Tables.FindAsync(tableId);
+            if (table != null)
+            {
+                table.IsOccupied = false;
+            }
+        }
+    }
+
+    await db.SaveChangesAsync();
+
+    // Đồng bộ lại trạng thái của tất cả màn hình (Bếp, Khách, Nhân viên)
+    await hubContext.Clients.All.SendAsync("TableCheckedOut", tableId);
+
+    return Results.Ok(order);
+});
+
 // ── Thu Ngân APIs ────────────────────────────────────────────────────
 app.MapGet("/api/orders/active", async (RestaurantDbContext db) =>
     await db.Orders.Where(o => !o.IsPaid).ToListAsync());
@@ -196,3 +231,4 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "5296";
 app.Run($"http://0.0.0.0:{port}");
 
 public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount);
+public record UpdateOrderDto(string OrderDetails, double TotalAmount);

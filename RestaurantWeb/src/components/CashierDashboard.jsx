@@ -59,17 +59,104 @@ export default function CashierDashboard({ showToast }) {
   };
 
   const handleCancelOrder = async (orderId, orderDetails) => {
-    const pin = window.prompt(`Bạn có chắc chắn muốn hủy đơn "${orderDetails}"? Vui lòng nhập mã PIN Quản lý để xác nhận:`);
-    if (pin === "1234") {
-      try {
-        await api.deleteOrder(orderId);
-        showToast("Đã hủy món ăn thành công!");
-        loadData();
-      } catch (err) {
-        showToast("Lỗi hủy món ăn!", "error");
+    // Phân tách chuỗi orderDetails thành mảng các món ăn
+    // Ví dụ: "2x Mực Hấp, 1x Bia" -> ["2x Mực Hấp", "1x Bia"]
+    const items = orderDetails.split(',').map(s => s.trim()).filter(Boolean);
+    
+    if (items.length <= 1) {
+      // Nếu chỉ có 1 món duy nhất trong đơn hàng, tiến hành hủy toàn bộ đơn hàng
+      const pin = window.prompt(`Bạn có chắc chắn muốn hủy món "${orderDetails}"? Vui lòng nhập mã PIN Quản lý:`);
+      if (pin === "1234") {
+        try {
+          await api.deleteOrder(orderId);
+          showToast("Đã hủy món ăn thành công!");
+          loadData();
+        } catch (err) {
+          showToast("Lỗi hủy món ăn!", "error");
+        }
+      } else if (pin !== null) {
+        showToast("Sai mã PIN Quản lý!", "error");
       }
-    } else if (pin !== null) {
-      showToast("Sai mã PIN Quản lý!", "error");
+      return;
+    }
+
+    // Nếu có nhiều món, chúng ta cho phép chọn món cụ thể để hủy lẻ
+    let promptMsg = `Hóa đơn này có nhiều món. Vui lòng chọn số thứ tự món muốn HỦY LẺ:\n`;
+    items.forEach((item, idx) => {
+      promptMsg += `${idx + 1}. ${item}\n`;
+    });
+    promptMsg += `Nhập số thứ tự cần hủy (1-${items.length}):`;
+
+    const choiceStr = window.prompt(promptMsg);
+    if (!choiceStr) return;
+
+    const choiceIdx = parseInt(choiceStr) - 1;
+    if (isNaN(choiceIdx) || choiceIdx < 0 || choiceIdx >= items.length) {
+      showToast("Lựa chọn không hợp lệ!", "error");
+      return;
+    }
+
+    const itemToCancel = items[choiceIdx];
+    
+    // Nhập mã PIN Quản lý để phê duyệt hủy món lẻ
+    const pin = window.prompt(`Xác nhận HỦY món "${itemToCancel}"? Vui lòng nhập mã PIN Quản lý:`);
+    if (pin !== "1234") {
+      if (pin !== null) showToast("Sai mã PIN Quản lý!", "error");
+      return;
+    }
+
+    // Tiến hành tính toán giảm trừ giá tiền của món đó!
+    try {
+      const match = itemToCancel.match(/^(\d+)x\s+(.+)$/);
+      if (!match) {
+        showToast("Lỗi phân tích món ăn!", "error");
+        return;
+      }
+
+      const qty = parseInt(match[1]);
+      const itemName = match[2].trim();
+
+      // Tìm giá tiền của món ăn đó trong danh sách thực đơn
+      const menu = await api.getMenuItems();
+      const menuItem = menu.find(m => m.name.toLowerCase() === itemName.toLowerCase());
+      if (!menuItem) {
+        showToast("Không tìm thấy giá món ăn để hoàn tiền!", "error");
+        return;
+      }
+      const itemPrice = parseFloat(menuItem.price);
+
+      // Cập nhật lại danh sách món và giá tiền
+      let updatedItems = [...items];
+      let priceToRefund = itemPrice;
+
+      if (qty > 1) {
+        // Giảm số lượng đi 1 phần
+        updatedItems[choiceIdx] = `${qty - 1}x ${itemName}`;
+      } else {
+        // Xóa hẳn món này ra khỏi danh sách
+        updatedItems.splice(choiceIdx, 1);
+      }
+
+      const newOrderDetails = updatedItems.join(', ');
+      
+      // Lấy đơn hàng hiện tại
+      const allActive = await api.getActiveOrders();
+      const currentOrder = allActive.find(o => o.id === orderId);
+      if (!currentOrder) return;
+
+      const newTotal = currentOrder.totalAmount - priceToRefund;
+
+      // Gọi API cập nhật
+      await api.updateOrder(orderId, {
+        orderDetails: newOrderDetails,
+        totalAmount: newTotal
+      });
+
+      showToast(`Đã giảm/hủy thành công 1 phần "${itemName}"!`);
+      loadData();
+    } catch (err) {
+      showToast("Lỗi xử lý hủy món lẻ!", "error");
+      console.error(err);
     }
   };
 

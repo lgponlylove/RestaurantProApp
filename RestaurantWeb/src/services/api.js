@@ -55,6 +55,14 @@ export const api = {
         });
         return res.json();
     },
+    updateOrder: async (id, orderData) => {
+        const res = await fetch(`${API_BASE_URL}/api/orders/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderData)
+        });
+        return res.json();
+    },
     getRevenueStats: async () => {
         const res = await fetch(`${API_BASE_URL}/api/stats/revenue`);
         return res.json();
