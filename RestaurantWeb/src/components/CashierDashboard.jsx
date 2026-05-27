@@ -551,6 +551,32 @@ export default function CashierDashboard({ showToast }) {
                   </div>
                 </div>
 
+                {/* Giao diện hiển thị VietQR Động miễn phí khi chọn Chuyển khoản */}
+                {paymentMethod === "Chuyển khoản" && (
+                  <div style={{
+                    marginTop: '12px',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--glass-border)',
+                    borderRadius: '12px',
+                    padding: '12px 15px',
+                    textAlign: 'center',
+                    animation: 'slideUp 0.3s ease-out'
+                  }}>
+                    <div style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 700, marginBottom: '8px' }}>
+                      💵 Quét VietQR Thanh Toán Động (Miễn phí)
+                    </div>
+                    <img 
+                      src={`https://img.vietqr.io/image/MB-123456789-qr_only.png?amount=${Math.round((getTableTotal(selectedTable.id) + (selectedTable.type === 'VIP' ? (selectedTable.serviceCharge || 0) : 0)) * (1 - discount / 100))}&addInfo=Ban%20${selectedTable.name.replace(/\s+/g, '')}%20Thanh%20Toan&accountName=NHA%20HANG%20RESTAURANT%20PRO`}
+                      alt="VietQR Payment"
+                      style={{ width: '130px', height: '130px', margin: '0 auto', display: 'block', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}
+                    />
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.4 }}>
+                      Ngân hàng: <strong>MB Bank</strong><br />
+                      Số TK: <strong>123456789</strong> | Tên TK: <strong>RESTAURANT PRO</strong>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem', flexDirection: 'column' }}>
                   <button
                     className="glass-button"
@@ -726,6 +752,21 @@ export default function CashierDashboard({ showToast }) {
                 <span>{currentReceipt.finalAmount.toLocaleString()} đ</span>
               </div>
             </div>
+
+            {currentReceipt.paymentMethod === "Chuyển khoản" && (
+              <div style={{ textAlign: 'center', marginTop: '15px', borderTop: '1px dashed #111827', paddingTop: '15px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, marginBottom: '6px' }}>QUÉT MÃ CHUYỂN KHOẢN</div>
+                <img 
+                  src={`https://img.vietqr.io/image/MB-123456789-print.png?amount=${Math.round(currentReceipt.finalAmount)}&addInfo=Ban%20${currentReceipt.tableName.replace(/\s+/g, '')}%20Thanh%20Toan&accountName=RESTAURANT%20PRO`}
+                  alt="VietQR"
+                  style={{ width: '120px', height: '120px', margin: '0 auto', display: 'block', border: '1px solid #ddd', padding: '4px', background: '#fff' }}
+                />
+                <div style={{ fontSize: '0.65rem', color: '#333', marginTop: '6px', lineHeight: 1.3 }}>
+                  Ngân hàng: MB Bank<br />
+                  Số TK: 123456789 | Tên TK: RESTAURANT PRO
+                </div>
+              </div>
+            )}
 
             <div style={{ textAlign: 'center', marginTop: '25px', fontSize: '0.75rem', fontStyle: 'italic' }}>
               Cảm ơn quý khách và hẹn gặp lại!<br />★★★
