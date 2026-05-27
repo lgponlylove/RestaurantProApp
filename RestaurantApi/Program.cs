@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using RestaurantApi.Data;
 using RestaurantApi.Hubs;
 using RestaurantApi.Models;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,6 +48,35 @@ app.MapGet("/api/tables", async (RestaurantDbContext db) =>
 
 app.MapGet("/api/menu", async (RestaurantDbContext db) =>
     await db.MenuItems.ToListAsync());
+
+// ── Gửi Đơn Hàng Qua HTTP POST (Đảm bảo 100% thành công trên mobile) ──
+app.MapPost("/api/orders", async (RestaurantDbContext db, IHubContext<OrderHub> hubContext, OrderDto dto) =>
+{
+    var table = await db.Tables.FindAsync(dto.TableId);
+    string tableName = table?.Name ?? $"Bàn {dto.TableId}";
+    if (table != null)
+    {
+        table.IsOccupied = true;
+    }
+
+    var order = new Order
+    {
+        TableId = dto.TableId,
+        TableName = tableName,
+        OrderDetails = dto.OrderDetails,
+        TotalAmount = dto.TotalAmount,
+        CreatedAt = DateTime.UtcNow,
+        IsPaid = false
+    };
+
+    db.Orders.Add(order);
+    await db.SaveChangesAsync();
+
+    // Phát SignalR từ server đến các màn hình Bếp và Thu ngân
+    await hubContext.Clients.All.SendAsync("ReceiveNewOrder", dto.TableId, dto.OrderDetails, dto.TicketId, dto.TotalAmount, order.Id);
+
+    return Results.Ok(order);
+});
 
 // ── Thu Ngân APIs ────────────────────────────────────────────────────
 app.MapGet("/api/orders/active", async (RestaurantDbContext db) =>
@@ -136,3 +166,5 @@ app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
 // ── Chạy với PORT từ môi trường (Railway cung cấp) ───────────────────
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5296";
 app.Run($"http://0.0.0.0:{port}");
+
+public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount);

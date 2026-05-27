@@ -10,6 +10,7 @@ export default function CustomerOrder() {
   const [toast, setToast] = useState(null);
   const [showCart, setShowCart] = useState(false);
   const [ordered, setOrdered] = useState(false);
+  const [orderedHistory, setOrderedHistory] = useState([]);
   const sliderRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
@@ -17,13 +18,38 @@ export default function CustomerOrder() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const loadOrderedHistory = () => {
+    api.getActiveOrders().then(orders => {
+      const tableOrders = orders.filter(o => o.tableId === parseInt(tableId));
+      setOrderedHistory(tableOrders);
+    });
+  };
+
   useEffect(() => {
+    // Kết nối SignalR để đồng bộ tức thời khi thanh toán bàn
     signalRService.startConnection();
+    
+    const handleCheckout = (tId) => {
+      if (tId === parseInt(tableId)) {
+        setOrderedHistory([]);
+      }
+    };
+    signalRService.on("TableCheckedOut", handleCheckout);
+
     api.getTables().then(tables => {
       const found = tables.find(t => t.id === parseInt(tableId));
       setTable(found || { id: parseInt(tableId), name: `Bàn ${tableId}` });
     });
     api.getMenuItems().then(setMenuItems);
+    loadOrderedHistory();
+
+    // Định kỳ quét lấy danh sách món để đảm bảo đồng bộ hoàn hảo
+    const interval = setInterval(loadOrderedHistory, 8000);
+
+    return () => {
+      signalRService.off("TableCheckedOut", handleCheckout);
+      clearInterval(interval);
+    };
   }, [tableId]);
 
   const hotItems = menuItems.filter(i => i.isHot);
@@ -53,10 +79,16 @@ export default function CustomerOrder() {
     try {
       const ticketId = Date.now().toString();
       const orderDetails = cart.map(i => `${i.quantity}x ${i.name}`).join(', ');
-      await signalRService.sendNewOrder(parseInt(tableId), orderDetails, ticketId, totalAmount);
+      await api.placeOrder({
+        tableId: parseInt(tableId),
+        orderDetails,
+        ticketId,
+        totalAmount
+      });
       setOrdered(true);
       setCart([]);
       setShowCart(false);
+      loadOrderedHistory();
     } catch (err) {
       showToast('Lỗi kết nối. Vui lòng thử lại!', 'error');
     }
@@ -116,6 +148,38 @@ export default function CustomerOrder() {
           {table?.name} — Chọn món bạn muốn thưởng thức
         </p>
       </div>
+
+      {/* Danh sách món đã gọi trước đó */}
+      {orderedHistory.length > 0 && (
+        <div style={{
+          margin: '1.25rem', padding: '15px', borderRadius: '16px',
+          background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+          boxShadow: 'var(--glass-shadow)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '1.2rem' }}>✅</span>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--success-color)', margin: 0 }}>
+              Món Đã Gọi & Đang Chờ Phục Vụ
+            </h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {orderedHistory.map((order, idx) => (
+              <div key={order.id || idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', paddingBottom: '6px', borderBottom: '1px dotted rgba(255,255,255,0.1)' }}>
+                <span style={{ fontWeight: 600 }}>{order.orderDetails}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
+                  {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.9rem', fontWeight: 700 }}>
+              <span>Tổng cộng đã đặt:</span>
+              <span style={{ color: '#fbbf24' }}>
+                {orderedHistory.reduce((sum, o) => sum + o.totalAmount, 0).toLocaleString()} đ
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ padding: '1.25rem' }}>
         {/* Hot Slider */}
