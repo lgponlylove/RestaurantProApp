@@ -18,11 +18,11 @@ namespace RestaurantApi.Data
         {
             // Seed Data — chạy khi migration lần đầu
             modelBuilder.Entity<Table>().HasData(
-                new Table { Id = 1, Name = "Bàn 1", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "t1token1" },
-                new Table { Id = 2, Name = "Bàn 2", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "t2token2" },
-                new Table { Id = 3, Name = "Bàn 3", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "t3token3" },
-                new Table { Id = 4, Name = "Phòng VIP 1", IsOccupied = false, Type = "VIP", ServiceCharge = 100000, CurrentSessionToken = "t4token4" },
-                new Table { Id = 5, Name = "Phòng VIP 2", IsOccupied = false, Type = "VIP", ServiceCharge = 150000, CurrentSessionToken = "t5token5" }
+                new Table { Id = 1, Name = "Bàn 1", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "d8a3c9b2" },
+                new Table { Id = 2, Name = "Bàn 2", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "e7b1f5a4" },
+                new Table { Id = 3, Name = "Bàn 3", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "9c2d8e3f" },
+                new Table { Id = 4, Name = "Phòng VIP 1", IsOccupied = false, Type = "VIP", ServiceCharge = 100000, CurrentSessionToken = "f4a5c9d1" },
+                new Table { Id = 5, Name = "Phòng VIP 2", IsOccupied = false, Type = "VIP", ServiceCharge = 150000, CurrentSessionToken = "b8e2f6a7" }
             );
 
             modelBuilder.Entity<MenuItem>().HasData(
