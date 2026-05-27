@@ -3,6 +3,11 @@ using RestaurantApi.Data;
 using RestaurantApi.Hubs;
 using RestaurantApi.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +20,29 @@ builder.Services.AddDbContext<RestaurantDbContext>(options =>
 
 // ── SignalR ───────────────────────────────────────────────────────────
 builder.Services.AddSignalR();
+
+// ── JWT Bearer Authentication & Authorization ────────────────────────
+var jwtSecret = builder.Configuration["JwtSecret"] ?? "RestaurantProVerySecretKeyForSigningJWTs2026!!!";
+var key = Encoding.ASCII.GetBytes(jwtSecret);
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ClockSkew = TimeSpan.Zero
+    };
+});
+builder.Services.AddAuthorization();
 
 // ── CORS: cho phép Frontend (localhost dev + Vercel production) ───────
 builder.Services.AddCors(options =>
@@ -38,9 +66,46 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseCors("AllowAll");
+app.UseAuthentication();
+app.UseAuthorization();
 
 // ── SignalR Hub ───────────────────────────────────────────────────────
 app.MapHub<OrderHub>("/orderHub");
+
+// ── Auth APIs ────────────────────────────────────────────────────────
+app.MapPost("/api/auth/login", async (RestaurantDbContext db, LoginDto dto) =>
+{
+    var user = await db.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == dto.Username.ToLower());
+    if (user == null || !SecurityUtils.VerifyPassword(dto.Password, user.PasswordHash))
+    {
+        return Results.Json(new { message = "Sai tài khoản hoặc mật khẩu!" }, statusCode: 401);
+    }
+
+    var tokenHandler = new JwtSecurityTokenHandler();
+    var key = Encoding.ASCII.GetBytes(jwtSecret);
+
+    var tokenDescriptor = new SecurityTokenDescriptor
+    {
+        Subject = new ClaimsIdentity(new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Username),
+            new Claim(ClaimTypes.Role, user.Role)
+        }),
+        Expires = DateTime.UtcNow.AddDays(7),
+        SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+    };
+
+    var token = tokenHandler.CreateToken(tokenDescriptor);
+    var tokenString = tokenHandler.WriteToken(token);
+
+    return Results.Ok(new
+    {
+        token = tokenString,
+        username = user.Username,
+        role = user.Role
+    });
+});
 
 // ── Minimal APIs ──────────────────────────────────────────────────────
 app.MapGet("/api/tables", async (RestaurantDbContext db) =>
@@ -135,7 +200,7 @@ app.MapDelete("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<Ord
     await hubContext.Clients.All.SendAsync("TableCheckedOut", tableId);
 
     return Results.Ok(new { message = "Đã hủy món thành công" });
-});
+}).RequireAuthorization();
 
 // ── Cập Nhật Chi Tiết Đơn Hàng (Cho phép Hủy từng món lẻ) ─────────────
 app.MapPut("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<OrderHub> hubContext, int id, UpdateOrderDto dto) =>
@@ -186,26 +251,24 @@ app.MapPut("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<OrderH
     await hubContext.Clients.All.SendAsync("TableCheckedOut", tableId);
 
     return Results.Ok(order);
-});
+}).RequireAuthorization();
 
-// ── Thu Ngân APIs ────────────────────────────────────────────────────
 app.MapGet("/api/orders/active", async (RestaurantDbContext db) =>
-    await db.Orders.Where(o => !o.IsPaid).ToListAsync());
+    await db.Orders.Where(o => !o.IsPaid).ToListAsync()).RequireAuthorization();
 
 app.MapGet("/api/invoices", async (RestaurantDbContext db) =>
-    await db.Invoices.OrderByDescending(i => i.CreatedAt).ToListAsync());
+    await db.Invoices.OrderByDescending(i => i.CreatedAt).ToListAsync()).RequireAuthorization();
 
 // ── Nhật Ký Hủy Món (Security Audit Log) ─────────────────────────────
 app.MapGet("/api/cancelled-orders", async (RestaurantDbContext db) =>
-    await db.CancelledOrders.OrderByDescending(c => c.CancelledAt).ToListAsync());
+    await db.CancelledOrders.OrderByDescending(c => c.CancelledAt).ToListAsync()).RequireAuthorization();
 
-// ── Quản Lý Thực Đơn CRUD ────────────────────────────────────────────
 app.MapPost("/api/menu", async (RestaurantDbContext db, MenuItem item) =>
 {
     db.MenuItems.Add(item);
     await db.SaveChangesAsync();
     return Results.Created($"/api/menu/{item.Id}", item);
-});
+}).RequireAuthorization();
 
 app.MapPut("/api/menu/{id}", async (RestaurantDbContext db, int id, MenuItem updatedItem) =>
 {
@@ -220,7 +283,7 @@ app.MapPut("/api/menu/{id}", async (RestaurantDbContext db, int id, MenuItem upd
     
     await db.SaveChangesAsync();
     return Results.Ok(item);
-});
+}).RequireAuthorization();
 
 app.MapDelete("/api/menu/{id}", async (RestaurantDbContext db, int id) =>
 {
@@ -230,7 +293,7 @@ app.MapDelete("/api/menu/{id}", async (RestaurantDbContext db, int id) =>
     db.MenuItems.Remove(item);
     await db.SaveChangesAsync();
     return Results.Ok(new { message = "Đã xóa món ăn thành công" });
-});
+}).RequireAuthorization();
 
 // ── Thống Kê Doanh Thu ───────────────────────────────────────────────
 app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
@@ -275,7 +338,7 @@ app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
         TotalInvoices = totalInvoices,
         BestSellers = bestSellers
     });
-});
+}).RequireAuthorization();
 
 // ── Chạy với PORT từ môi trường (Railway cung cấp) ───────────────────
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5296";
@@ -283,3 +346,4 @@ app.Run($"http://0.0.0.0:{port}");
 
 public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount);
 public record UpdateOrderDto(string OrderDetails, double TotalAmount, string? CancelledItemName = null, int CancelledQty = 0, double CancelledPrice = 0, string? Reason = null);
+public record LoginDto(string Username, string Password);

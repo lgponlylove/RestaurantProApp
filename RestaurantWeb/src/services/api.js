@@ -2,27 +2,59 @@ import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5296';
 
+const getHeaders = (hasBody = false) => {
+    const headers = {};
+    if (hasBody) {
+        headers['Content-Type'] = 'application/json';
+    }
+    const token = localStorage.getItem('token');
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+};
+
 export const api = {
+    login: async (username, password) => {
+        const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.message || 'Đăng nhập thất bại');
+        }
+        return res.json();
+    },
     getTables: async () => {
-        const res = await fetch(`${API_BASE_URL}/api/tables`);
+        const res = await fetch(`${API_BASE_URL}/api/tables`, {
+            headers: getHeaders()
+        });
         return res.json();
     },
     getMenuItems: async () => {
-        const res = await fetch(`${API_BASE_URL}/api/menu`);
+        const res = await fetch(`${API_BASE_URL}/api/menu`, {
+            headers: getHeaders()
+        });
         return res.json();
     },
     getActiveOrders: async () => {
-        const res = await fetch(`${API_BASE_URL}/api/orders/active`);
+        const res = await fetch(`${API_BASE_URL}/api/orders/active`, {
+            headers: getHeaders()
+        });
         return res.json();
     },
     getInvoices: async () => {
-        const res = await fetch(`${API_BASE_URL}/api/invoices`);
+        const res = await fetch(`${API_BASE_URL}/api/invoices`, {
+            headers: getHeaders()
+        });
         return res.json();
     },
     addMenuItem: async (item) => {
         const res = await fetch(`${API_BASE_URL}/api/menu`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(true),
             body: JSON.stringify(item)
         });
         return res.json();
@@ -30,45 +62,51 @@ export const api = {
     editMenuItem: async (id, item) => {
         const res = await fetch(`${API_BASE_URL}/api/menu/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(true),
             body: JSON.stringify(item)
         });
         return res.json();
     },
     deleteMenuItem: async (id) => {
         const res = await fetch(`${API_BASE_URL}/api/menu/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getHeaders()
         });
         return res.json();
     },
     placeOrder: async (orderData) => {
         const res = await fetch(`${API_BASE_URL}/api/orders`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(true),
             body: JSON.stringify(orderData)
         });
         return res.json();
     },
     deleteOrder: async (id) => {
         const res = await fetch(`${API_BASE_URL}/api/orders/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getHeaders()
         });
         return res.json();
     },
     updateOrder: async (id, orderData) => {
         const res = await fetch(`${API_BASE_URL}/api/orders/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getHeaders(true),
             body: JSON.stringify(orderData)
         });
         return res.json();
     },
     getRevenueStats: async () => {
-        const res = await fetch(`${API_BASE_URL}/api/stats/revenue`);
+        const res = await fetch(`${API_BASE_URL}/api/stats/revenue`, {
+            headers: getHeaders()
+        });
         return res.json();
     },
     getCancelledOrders: async () => {
-        const res = await fetch(`${API_BASE_URL}/api/cancelled-orders`);
+        const res = await fetch(`${API_BASE_URL}/api/cancelled-orders`, {
+            headers: getHeaders()
+        });
         return res.json();
     }
 };

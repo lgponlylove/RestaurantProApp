@@ -12,6 +12,7 @@ namespace RestaurantApi.Data
         public DbSet<Order> Orders { get; set; }
         public DbSet<Invoice> Invoices { get; set; }
         public DbSet<CancelledOrder> CancelledOrders { get; set; }
+        public DbSet<User> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -48,6 +49,12 @@ namespace RestaurantApi.Data
                 new MenuItem { Id = 8, Name = "Nước Ép Dưa Hấu", Price = 35000, Category = "Đồ Uống",
                     ImageUrl = "https://images.unsplash.com/photo-1622597467836-f3e6707fd04f?w=600&q=80",
                     IsHot = false }
+            );
+
+            modelBuilder.Entity<User>().HasData(
+                new User { Id = 1, Username = "admin", PasswordHash = SecurityUtils.HashPassword("admin123"), Role = "Admin" },
+                new User { Id = 2, Username = "cashier", PasswordHash = SecurityUtils.HashPassword("cashier123"), Role = "Cashier" },
+                new User { Id = 3, Username = "kitchen", PasswordHash = SecurityUtils.HashPassword("kitchen123"), Role = "Kitchen" }
             );
         }
     }
