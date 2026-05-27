@@ -83,7 +83,8 @@ export default function CustomerOrder() {
         tableId: parseInt(tableId),
         orderDetails,
         ticketId,
-        totalAmount
+        totalAmount,
+        isApproved: false
       });
       setOrdered(true);
       setCart([]);
@@ -98,22 +99,28 @@ export default function CustomerOrder() {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center'
+        alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center',
+        background: 'linear-gradient(135deg, rgba(0,0,0,0.8), rgba(20,20,20,0.9))', color: '#fff'
       }}>
-        <div style={{ fontSize: '5rem', marginBottom: '1.5rem' }}>✅</div>
-        <h1 style={{ fontSize: '1.8rem', marginBottom: '1rem' }} className="text-gradient">
-          Đã Gọi Món Thành Công!
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.7 }}>
-          Nhà bếp đã nhận được yêu cầu của bạn.<br />Vui lòng chờ trong giây lát nhé! 🙏
-        </p>
-        <button
-          className="glass-button btn-primary"
-          style={{ padding: '14px 32px', fontSize: '1rem' }}
-          onClick={() => setOrdered(false)}
-        >
-          ➕ Gọi thêm món
-        </button>
+        <div className="glass-panel animate-slide-up" style={{ padding: '3rem 2rem', maxWidth: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{
+            fontSize: '4.5rem', marginBottom: '1.5rem',
+            animation: 'pulse 2s infinite ease-in-out'
+          }}>⏳</div>
+          <h1 style={{ fontSize: '1.6rem', marginBottom: '1rem', color: '#fbbf24' }}>
+            Đã Gửi Yêu Cầu!
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.7, fontSize: '0.95rem' }}>
+            Món ăn đang chờ <strong>Nhân viên phục vụ</strong> tại bàn phê duyệt để chuyển xuống nhà bếp.<br />Vui lòng đợi giây lát, chúng tôi sẽ chế biến ngay! ☕
+          </p>
+          <button
+            className="glass-button btn-success"
+            style={{ padding: '14px 32px', fontSize: '1.05rem', fontWeight: 700, width: '100%' }}
+            onClick={() => setOrdered(false)}
+          >
+            ➕ Tiếp Tục Xem Thực Đơn
+          </button>
+        </div>
       </div>
     );
   }
@@ -153,26 +160,33 @@ export default function CustomerOrder() {
       {orderedHistory.length > 0 && (
         <div style={{
           margin: '1.25rem', padding: '15px', borderRadius: '16px',
-          background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+          background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--glass-border)',
           boxShadow: 'var(--glass-shadow)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <span style={{ fontSize: '1.2rem' }}>✅</span>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--success-color)', margin: 0 }}>
-              Món Đã Gọi & Đang Chờ Phục Vụ
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '1.2rem' }}>📋</span>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-color)', margin: 0 }}>
+              Danh Sách Món Ăn Đã Đặt
             </h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {orderedHistory.map((order, idx) => (
-              <div key={order.id || idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', paddingBottom: '6px', borderBottom: '1px dotted rgba(255,255,255,0.1)' }}>
-                <span style={{ fontWeight: 600 }}>{order.orderDetails}</span>
+              <div key={order.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', paddingBottom: '8px', borderBottom: '1px dotted rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontWeight: 600, color: order.isApproved ? '#fff' : 'rgba(255,255,255,0.6)' }}>
+                    {order.orderDetails}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', color: order.isApproved ? 'var(--success-color)' : '#fbbf24', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    {order.isApproved ? '🟢 Đã duyệt & đang nấu' : '⏳ Đang chờ nhân viên duyệt...'}
+                  </span>
+                </div>
                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
                   {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             ))}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '0.9rem', fontWeight: 700 }}>
-              <span>Tổng cộng đã đặt:</span>
+              <span>Tổng cộng:</span>
               <span style={{ color: '#fbbf24' }}>
                 {orderedHistory.reduce((sum, o) => sum + o.totalAmount, 0).toLocaleString()} đ
               </span>

@@ -4,24 +4,28 @@ import QRCodeDisplay from './QRCodeDisplay';
 
 export default function TableDashboard({ onSelectTable }) {
   const [tables, setTables] = useState([]);
+  const [activeOrders, setActiveOrders] = useState([]);
   const [qrTable, setQrTable] = useState(null);
 
-  useEffect(() => {
+  const loadData = () => {
     api.getTables().then(setTables);
+    api.getActiveOrders().then(setActiveOrders).catch(() => {});
+  };
 
-    const handleNewOrder = ({ tableId }) => {
-      setTables(prev => prev.map(t => t.id === tableId ? { ...t, isOccupied: true } : t));
-    };
+  useEffect(() => {
+    loadData();
 
-    const handleCheckout = ({ tableId }) => {
-      setTables(prev => prev.map(t => t.id === tableId ? { ...t, isOccupied: false } : t));
-    };
+    const handleNewOrder = () => loadData();
+    const handleCheckout = () => loadData();
+    const handlePending = () => loadData();
 
     signalRService.on("ReceiveNewOrder", handleNewOrder);
+    signalRService.on("ReceivePendingOrder", handlePending);
     signalRService.on("TableCheckedOut", handleCheckout);
 
     return () => {
       signalRService.off("ReceiveNewOrder", handleNewOrder);
+      signalRService.off("ReceivePendingOrder", handlePending);
       signalRService.off("TableCheckedOut", handleCheckout);
     };
   }, []);
@@ -29,16 +33,26 @@ export default function TableDashboard({ onSelectTable }) {
   return (
     <>
       <div className="grid-auto">
-        {tables.map(table => (
-          <div
-            key={table.id}
-            className="glass-panel"
-            style={{
-              textAlign: 'center',
-              borderTop: `4px solid ${table.isOccupied ? 'var(--danger-color)' : 'var(--success-color)'}`,
-              position: 'relative'
-            }}
-          >
+        {tables.map(table => {
+          const tableOrders = activeOrders.filter(o => o.tableId === table.id);
+          const hasPending = tableOrders.some(o => !o.isApproved);
+          const isOccupied = table.isOccupied || tableOrders.length > 0;
+          
+          let borderCol = 'var(--success-color)';
+          if (isOccupied) borderCol = 'var(--danger-color)';
+          if (hasPending) borderCol = '#fbbf24'; // Màu vàng cho đơn chờ duyệt
+
+          return (
+            <div
+              key={table.id}
+              className={`glass-panel ${hasPending ? 'pulse-yellow' : ''}`}
+              style={{
+                textAlign: 'center',
+                borderTop: `4px solid ${borderCol}`,
+                position: 'relative',
+                boxShadow: hasPending ? '0 0 15px rgba(251, 191, 36, 0.25)' : 'var(--glass-shadow)'
+              }}
+            >
             {/* Nút QR góc trên phải */}
             <button
               className="glass-button"
@@ -68,14 +82,16 @@ export default function TableDashboard({ onSelectTable }) {
                 </div>
               )}
               <span style={{
-                color: table.isOccupied ? 'var(--danger-color)' : 'var(--success-color)',
-                fontWeight: '600'
+                color: hasPending ? '#fbbf24' : isOccupied ? 'var(--danger-color)' : 'var(--success-color)',
+                fontWeight: '700',
+                animation: hasPending ? 'pulse 1.5s infinite' : 'none'
               }}>
-                {table.isOccupied ? '🔴 Đang phục vụ' : '🟢 Bàn trống'}
+                {hasPending ? '🟡 Đang chờ duyệt đơn' : isOccupied ? '🔴 Đang phục vụ' : '🟢 Bàn trống'}
               </span>
             </div>
           </div>
-        ))}
+        );
+      })}
       </div>
 
       {/* Popup QR Code */}

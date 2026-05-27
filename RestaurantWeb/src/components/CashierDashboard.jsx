@@ -61,9 +61,14 @@ export default function CashierDashboard({ showToast }) {
 
   const occupiedTables = tables.filter(t => t.isOccupied);
 
-  // Lấy danh sách các đơn hàng chưa thanh toán của bàn được chọn
+  // Lấy danh sách các đơn hàng chưa thanh toán của bàn được chọn (Đã được duyệt)
   const getTableOrders = (tableId) => {
-    return activeOrders.filter(o => o.tableId === tableId);
+    return activeOrders.filter(o => o.tableId === tableId && o.isApproved);
+  };
+
+  // Lấy danh sách các đơn hàng chưa thanh toán của bàn được chọn (Chưa được duyệt)
+  const getPendingTableOrders = (tableId) => {
+    return activeOrders.filter(o => o.tableId === tableId && !o.isApproved);
   };
 
   // Tính tổng tiền tạm tính của bàn
@@ -75,6 +80,16 @@ export default function CashierDashboard({ showToast }) {
     setSelectedTable(table);
     setDiscount(0);
     setPaymentMethod("Tiền mặt");
+  };
+
+  const handleApproveOrder = async (orderId) => {
+    try {
+      await api.approveOrder(orderId);
+      showToast("Đã phê duyệt đơn đặt món thành công! Đã chuyển xuống Bếp.");
+      loadData();
+    } catch (err) {
+      showToast("Lỗi khi phê duyệt đơn hàng!", "error");
+    }
   };
 
   const handleCancelOrder = async (orderId, orderDetails) => {
@@ -385,6 +400,36 @@ export default function CashierDashboard({ showToast }) {
                 <h3 style={{ marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px' }}>
                   💳 Hóa Đơn Chi Tiết — {selectedTable.name}
                 </h3>
+
+                {/* Danh sách các đơn hàng chờ duyệt từ khách hàng quét QR */}
+                {getPendingTableOrders(selectedTable.id).length > 0 && (
+                  <div style={{
+                    background: 'rgba(251, 191, 36, 0.08)',
+                    border: '1px solid rgba(251, 191, 36, 0.3)',
+                    borderRadius: '12px',
+                    padding: '12px 15px',
+                    marginBottom: '1.25rem',
+                    animation: 'slideUp 0.3s ease-out'
+                  }}>
+                    <h4 style={{ color: '#fbbf24', fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      ⏳ Yêu Cầu Gọi Món Trực Tuyến Chờ Duyệt
+                    </h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {getPendingTableOrders(selectedTable.id).map(order => (
+                        <div key={order.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', gap: '10px', background: 'rgba(0,0,0,0.15)', padding: '6px 10px', borderRadius: '8px' }}>
+                          <span style={{ fontWeight: 600, color: '#f8fafc' }}>{order.orderDetails}</span>
+                          <button
+                            className="glass-button btn-success"
+                            style={{ padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, flexShrink: 0, height: '26px' }}
+                            onClick={() => handleApproveOrder(order.id)}
+                          >
+                            ⚡ Duyệt
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                  {/* Danh sách món ăn chi tiết lẻ từng sản phẩm */}
                 <div style={{ maxHeight: '35vh', overflowY: 'auto', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '10px' }}>

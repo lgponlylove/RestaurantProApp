@@ -58,6 +58,10 @@ function StaffApp() {
       });
     };
 
+    const handlePendingOrder = ({ tableId }) => {
+      showToast(`🔔 Bàn ${tableId} vừa gửi yêu cầu đặt món trực tuyến! Đang chờ duyệt.`, 'info');
+    };
+
     const handleItemCooked = ({ ticketId, tableId }) => {
       setCarts(prev => {
         const tableCart = prev[tableId];
@@ -68,9 +72,11 @@ function StaffApp() {
     };
 
     signalRService.on("ReceiveNewOrder", handleNewOrder);
+    signalRService.on("ReceivePendingOrder", handlePendingOrder);
     signalRService.on("ItemCooked", handleItemCooked);
     return () => {
       signalRService.off("ReceiveNewOrder", handleNewOrder);
+      signalRService.off("ReceivePendingOrder", handlePendingOrder);
       signalRService.off("ItemCooked", handleItemCooked);
     };
   }, []);

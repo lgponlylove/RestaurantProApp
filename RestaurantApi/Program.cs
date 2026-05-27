@@ -131,14 +131,22 @@ app.MapPost("/api/orders", async (RestaurantDbContext db, IHubContext<OrderHub> 
         OrderDetails = dto.OrderDetails,
         TotalAmount = dto.TotalAmount,
         CreatedAt = DateTime.UtcNow.AddHours(7),
-        IsPaid = false
+        IsPaid = false,
+        IsApproved = dto.IsApproved ?? true
     };
 
     db.Orders.Add(order);
     await db.SaveChangesAsync();
 
-    // Phát SignalR từ server đến các màn hình Bếp và Thu ngân
-    await hubContext.Clients.All.SendAsync("ReceiveNewOrder", dto.TableId, dto.OrderDetails, dto.TicketId, dto.TotalAmount, order.Id);
+    // Phát SignalR: Nếu chưa duyệt, phát sự kiện chờ duyệt. Nếu đã duyệt, chuyển thẳng đến Bếp
+    if (order.IsApproved)
+    {
+        await hubContext.Clients.All.SendAsync("ReceiveNewOrder", dto.TableId, dto.OrderDetails, dto.TicketId, dto.TotalAmount, order.Id);
+    }
+    else
+    {
+        await hubContext.Clients.All.SendAsync("ReceivePendingOrder", dto.TableId, dto.OrderDetails, dto.TicketId, dto.TotalAmount, order.Id);
+    }
 
     return Results.Ok(order);
 });
@@ -249,6 +257,22 @@ app.MapPut("/api/orders/{id}", async (RestaurantDbContext db, IHubContext<OrderH
 
     // Đồng bộ lại trạng thái của tất cả màn hình (Bếp, Khách, Nhân viên)
     await hubContext.Clients.All.SendAsync("TableCheckedOut", tableId);
+
+    return Results.Ok(order);
+}).RequireAuthorization();
+
+// ── Phê Duyệt Đơn Hàng Từ Khách Quét QR (Yêu cầu quyền Quản lý/Thu ngân) ──
+app.MapPut("/api/orders/{id}/approve", async (RestaurantDbContext db, IHubContext<OrderHub> hubContext, int id) =>
+{
+    var order = await db.Orders.FindAsync(id);
+    if (order == null) return Results.NotFound();
+
+    order.IsApproved = true;
+    await db.SaveChangesAsync();
+
+    // Phát SignalR thông báo đơn hàng đã được phê duyệt, gửi vé nấu xuống Bếp
+    string ticketId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+    await hubContext.Clients.All.SendAsync("ReceiveNewOrder", order.TableId, order.OrderDetails, ticketId, order.TotalAmount, order.Id);
 
     return Results.Ok(order);
 }).RequireAuthorization();
@@ -375,6 +399,6 @@ app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5296";
 app.Run($"http://0.0.0.0:{port}");
 
-public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount);
+public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount, bool? IsApproved = null);
 public record UpdateOrderDto(string OrderDetails, double TotalAmount, string? CancelledItemName = null, int CancelledQty = 0, double CancelledPrice = 0, string? Reason = null);
 public record LoginDto(string Username, string Password);

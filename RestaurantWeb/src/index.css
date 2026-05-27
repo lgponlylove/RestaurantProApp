@@ -226,3 +226,22 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary-color);
 }
+
+.pulse-yellow {
+  animation: borderGlow 2s infinite ease-in-out;
+}
+
+@keyframes borderGlow {
+  0% {
+    border-top-color: #fbbf24;
+    box-shadow: 0 0 5px rgba(251, 191, 36, 0.2);
+  }
+  50% {
+    border-top-color: #f59e0b;
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.6);
+  }
+  100% {
+    border-top-color: #fbbf24;
+    box-shadow: 0 0 5px rgba(251, 191, 36, 0.2);
+  }
+}

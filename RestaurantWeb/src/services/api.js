@@ -105,6 +105,13 @@ export const api = {
         });
         return res.json();
     },
+    approveOrder: async (id) => {
+        const res = await fetch(`${API_BASE_URL}/api/orders/${id}/approve`, {
+            method: 'PUT',
+            headers: getHeaders()
+        });
+        return res.json();
+    },
     deleteOrder: async (id) => {
         const res = await fetch(`${API_BASE_URL}/api/orders/${id}`, {
             method: 'DELETE',
@@ -151,6 +158,10 @@ class SignalRService {
 
         this.connection.on("ReceiveNewOrder", (tableId, orderDetails, ticketId) => {
             this.emit("ReceiveNewOrder", { tableId, orderDetails, ticketId });
+        });
+
+        this.connection.on("ReceivePendingOrder", (tableId, orderDetails, ticketId, totalAmount, orderId) => {
+            this.emit("ReceivePendingOrder", { tableId, orderDetails, ticketId, totalAmount, orderId });
         });
 
         this.connection.on("ItemCooked", (ticketId, tableId) => {

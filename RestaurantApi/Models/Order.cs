@@ -11,5 +11,6 @@ namespace RestaurantApi.Models
         public double TotalAmount { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow.AddHours(7);
         public bool IsPaid { get; set; } = false;
+        public bool IsApproved { get; set; } = true; // Default to true (waiter orders)
     }
 }
