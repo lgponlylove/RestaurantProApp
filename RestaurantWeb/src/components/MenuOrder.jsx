@@ -57,16 +57,13 @@ export default function MenuOrder({ table, onBack, cart, updateCart, clearCart, 
     }
   };
 
-  const checkout = async () => {
-    if (window.confirm(`Tổng số tiền là ${totalAmount.toLocaleString()} đ. Xác nhận thanh toán?`)) {
-      try {
-        await signalRService.checkoutTable(table.id);
-        clearCart();
-        showToast('Thanh toán thành công!');
-        onBack();
-      } catch (err) {
-        showToast('Lỗi kết nối máy chủ!', 'error');
-      }
+  const handleRequestCheckout = async () => {
+    try {
+      await signalRService.requestCheckout(table.id);
+      showToast('🛎️ Đã gửi yêu cầu thanh toán! Thu ngân đang chuẩn bị hóa đơn...');
+      onBack();
+    } catch (err) {
+      showToast('Lỗi gửi yêu cầu thanh toán!', 'error');
     }
   };
 
@@ -260,8 +257,8 @@ export default function MenuOrder({ table, onBack, cart, updateCart, clearCart, 
                   🍳 Đặt Món & Gửi Bếp
                 </button>
               )}
-              {table.isOccupied && allCooked && (
-                <button className="glass-button btn-danger" style={{ width: '100%', padding: '12px', fontWeight: 700 }} onClick={checkout}>
+              {(table.isOccupied || normalizedCart.some(i => i.status !== 'new')) && (
+                <button className="glass-button btn-danger" style={{ width: '100%', padding: '12px', fontWeight: 700 }} onClick={handleRequestCheckout}>
                   💳 Yêu Cầu Thanh Toán
                 </button>
               )}
