@@ -295,6 +295,37 @@ app.MapDelete("/api/menu/{id}", async (RestaurantDbContext db, int id) =>
     return Results.Ok(new { message = "Đã xóa món ăn thành công" });
 }).RequireAuthorization();
 
+// ── Quản Lý Bàn Ăn & Phòng VIP CRUD ──────────────────────────────────
+app.MapPost("/api/tables", async (RestaurantDbContext db, Table table) =>
+{
+    db.Tables.Add(table);
+    await db.SaveChangesAsync();
+    return Results.Created($"/api/tables/{table.Id}", table);
+}).RequireAuthorization();
+
+app.MapPut("/api/tables/{id}", async (RestaurantDbContext db, int id, Table updatedTable) =>
+{
+    var table = await db.Tables.FindAsync(id);
+    if (table == null) return Results.NotFound();
+    
+    table.Name = updatedTable.Name;
+    table.Type = updatedTable.Type;
+    table.ServiceCharge = updatedTable.ServiceCharge;
+    
+    await db.SaveChangesAsync();
+    return Results.Ok(table);
+}).RequireAuthorization();
+
+app.MapDelete("/api/tables/{id}", async (RestaurantDbContext db, int id) =>
+{
+    var table = await db.Tables.FindAsync(id);
+    if (table == null) return Results.NotFound();
+    
+    db.Tables.Remove(table);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { message = "Đã xóa bàn/phòng thành công" });
+}).RequireAuthorization();
+
 // ── Thống Kê Doanh Thu ───────────────────────────────────────────────
 app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
 {

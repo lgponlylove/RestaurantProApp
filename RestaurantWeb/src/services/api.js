@@ -33,6 +33,29 @@ export const api = {
         });
         return res.json();
     },
+    addTable: async (table) => {
+        const res = await fetch(`${API_BASE_URL}/api/tables`, {
+            method: 'POST',
+            headers: getHeaders(true),
+            body: JSON.stringify(table)
+        });
+        return res.json();
+    },
+    editTable: async (id, table) => {
+        const res = await fetch(`${API_BASE_URL}/api/tables/${id}`, {
+            method: 'PUT',
+            headers: getHeaders(true),
+            body: JSON.stringify(table)
+        });
+        return res.json();
+    },
+    deleteTable: async (id) => {
+        const res = await fetch(`${API_BASE_URL}/api/tables/${id}`, {
+            method: 'DELETE',
+            headers: getHeaders()
+        });
+        return res.json();
+    },
     getMenuItems: async () => {
         const res = await fetch(`${API_BASE_URL}/api/menu`, {
             headers: getHeaders()

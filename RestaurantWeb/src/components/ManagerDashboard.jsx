@@ -4,8 +4,18 @@ import { api } from '../services/api';
 export default function ManagerDashboard({ showToast }) {
   const [menuItems, setMenuItems] = useState([]);
   const [stats, setStats] = useState({ totalRevenue: 0, totalInvoices: 0, bestSellers: [] });
-  const [activeSubTab, setActiveSubTab] = useState("menu"); // menu, stats hoặc cancelled
+  const [activeSubTab, setActiveSubTab] = useState("menu"); // menu, stats, cancelled hoặc tables
   const [cancelledOrders, setCancelledOrders] = useState([]);
+  
+  // Trạng thái Quản lý Bàn ăn / Phòng VIP
+  const [tables, setTables] = useState([]);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [editingTable, setEditingTable] = useState(null);
+  const [tableFormData, setTableFormData] = useState({
+    name: "",
+    type: "Standard",
+    serviceCharge: 0
+  });
   
   // Trạng thái Form thêm/sửa món
   const [showFormModal, setShowFormModal] = useState(false);
@@ -22,12 +32,79 @@ export default function ManagerDashboard({ showToast }) {
     loadMenu();
     loadStats();
     loadCancelledOrders();
+    loadTables();
   }, []);
+
+  const loadTables = () => {
+    api.getTables()
+      .then(setTables)
+      .catch(err => console.error("Lỗi tải bàn ăn:", err));
+  };
 
   const loadCancelledOrders = () => {
     api.getCancelledOrders()
       .then(setCancelledOrders)
       .catch(err => console.error("Lỗi tải nhật ký hủy:", err));
+  };
+
+  const handleOpenAddTableModal = () => {
+    setEditingTable(null);
+    setTableFormData({
+      name: "",
+      type: "Standard",
+      serviceCharge: 0
+    });
+    setShowTableModal(true);
+  };
+
+  const handleOpenEditTableModal = (table) => {
+    setEditingTable(table);
+    setTableFormData({
+      name: table.name,
+      type: table.type || "Standard",
+      serviceCharge: table.serviceCharge || 0
+    });
+    setShowTableModal(true);
+  };
+
+  const handleTableFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!tableFormData.name) {
+      showToast("Tên bàn/phòng phải hợp lệ!", "error");
+      return;
+    }
+
+    try {
+      const payload = {
+        name: tableFormData.name,
+        type: tableFormData.type,
+        serviceCharge: tableFormData.serviceCharge
+      };
+
+      if (editingTable) {
+        await api.editTable(editingTable.id, payload);
+        showToast("Cập nhật thông tin bàn thành công!");
+      } else {
+        await api.addTable(payload);
+        showToast("Thêm bàn/phòng mới thành công!");
+      }
+      setShowTableModal(false);
+      loadTables();
+    } catch (err) {
+      showToast("Thao tác thất bại. Vui lòng kiểm tra lại!", "error");
+    }
+  };
+
+  const handleDeleteTable = async (id, name) => {
+    if (window.confirm(`Bạn có chắc chắn muốn xóa "${name}" khỏi sơ đồ nhà hàng?`)) {
+      try {
+        await api.deleteTable(id);
+        showToast("Đã xóa bàn ăn thành công!");
+        loadTables();
+      } catch (err) {
+        showToast("Lỗi khi xóa bàn ăn!", "error");
+      }
+    }
   };
 
   const loadMenu = () => {
@@ -139,6 +216,13 @@ export default function ManagerDashboard({ showToast }) {
           style={{ borderColor: activeSubTab === 'cancelled' ? 'var(--danger-color)' : '' }}
         >
           🚨 Nhật Ký Hủy Món
+        </button>
+        <button
+          className="glass-button"
+          onClick={() => { setActiveSubTab("tables"); loadTables(); }}
+          style={{ borderColor: activeSubTab === 'tables' ? 'var(--primary-color)' : '' }}
+        >
+          🏠 Quản Lý Bàn & Phòng
         </button>
       </div>
 
@@ -402,6 +486,82 @@ export default function ManagerDashboard({ showToast }) {
         </div>
       )}
 
+      {/* SUB-TAB 4: QUẢN LÝ BÀN & PHÒNG */}
+      {activeSubTab === "tables" && (
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem' }}>Sơ Đồ Bàn Ăn & Phòng VIP ({tables.length} bàn)</h3>
+            <button className="glass-button btn-success" onClick={handleOpenAddTableModal}>
+              ➕ Thêm Bàn / Phòng Mới
+            </button>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)' }}>
+                  <th style={{ padding: '12px' }}>Tên Bàn / Phòng</th>
+                  <th style={{ padding: '12px' }}>Loại</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Phí Dịch Vụ VIP</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Trạng Trạng Thái</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tables.map(table => (
+                  <tr key={table.id} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    <td style={{ padding: '12px', fontWeight: 700 }}>{table.name}</td>
+                    <td style={{ padding: '12px' }}>
+                      {table.type === 'VIP' ? (
+                        <span style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700 }}>
+                          💎 VIP
+                        </span>
+                      ) : (
+                        <span style={{ background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem' }}>
+                          Standard
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px', fontWeight: 700, color: '#fbbf24', textAlign: 'right' }}>
+                      {table.serviceCharge > 0 ? `${table.serviceCharge.toLocaleString()} đ` : '-'}
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      {table.isOccupied ? (
+                        <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '3px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600 }}>
+                          Có khách
+                        </span>
+                      ) : (
+                        <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '3px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 600 }}>
+                          Trống
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                        <button
+                          className="glass-button"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer' }}
+                          onClick={() => handleOpenEditTableModal(table)}
+                        >
+                          ✏️ Sửa
+                        </button>
+                        <button
+                          className="glass-button btn-danger"
+                          style={{ padding: '4px 10px', fontSize: '0.75rem', cursor: 'pointer' }}
+                          onClick={() => handleDeleteTable(table.id, table.name)}
+                        >
+                          🗑 Xóa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* FORM MODAL THÊM / SỬA MÓN ĂN */}
       {showFormModal && (
         <div style={{
@@ -488,6 +648,77 @@ export default function ManagerDashboard({ showToast }) {
                 </button>
                 <button type="button" className="glass-button" style={{ flex: 1, padding: '12px' }} onClick={() => setShowFormModal(false)}>
                   Hủy bỏ
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* FORM MODAL THÊM / SỬA BÀN ĂN */}
+      {showTableModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.3rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+              {editingTable ? "✏️ Chỉnh Sửa Bàn / Phòng" : "🏠 Thêm Bàn / Phòng Mới"}
+            </h3>
+
+            <form onSubmit={handleTableFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Tên bàn */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Tên bàn / số phòng:</label>
+                <input
+                  type="text"
+                  value={tableFormData.name}
+                  onChange={(e) => setTableFormData({ ...tableFormData, name: e.target.value })}
+                  style={{ background: 'var(--bg-color)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '10px', outline: 'none' }}
+                  placeholder="Ví dụ: Bàn 5, Phòng VIP 3"
+                  required
+                />
+              </div>
+
+              {/* Loại bàn */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Loại bàn:</label>
+                <select
+                  value={tableFormData.type}
+                  onChange={(e) => setTableFormData({ ...tableFormData, type: e.target.value, serviceCharge: e.target.value === 'Standard' ? 0 : tableFormData.serviceCharge })}
+                  style={{ background: 'var(--bg-color)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '10px', outline: 'none' }}
+                >
+                  <option value="Standard">Standard (Bàn Thường)</option>
+                  <option value="VIP">💎 VIP (Phòng VIP / Bàn VIP)</option>
+                </select>
+              </div>
+
+              {/* Phí dịch vụ */}
+              {tableFormData.type === 'VIP' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Phí dịch vụ phòng VIP (đ):</label>
+                  <input
+                    type="number"
+                    value={tableFormData.serviceCharge}
+                    onChange={(e) => setTableFormData({ ...tableFormData, serviceCharge: parseFloat(e.target.value) || 0 })}
+                    style={{ background: 'var(--bg-color)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', borderRadius: '8px', padding: '10px', outline: 'none' }}
+                    min="0"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Thao tác */}
+              <div style={{ display: 'flex', gap: '10px', marginTop: '1rem' }}>
+                <button type="submit" className="glass-button btn-success" style={{ flex: 1, padding: '12px', cursor: 'pointer' }}>
+                  Lưu Lại
+                </button>
+                <button type="button" className="glass-button" style={{ flex: 1, padding: '12px', cursor: 'pointer' }} onClick={() => setShowTableModal(false)}>
+                  Hủy Bỏ
                 </button>
               </div>
 

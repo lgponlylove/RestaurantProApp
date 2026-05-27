@@ -54,7 +54,19 @@ export default function TableDashboard({ onSelectTable }) {
 
             {/* Nội dung bàn — click để chọn */}
             <div style={{ cursor: 'pointer', paddingTop: '8px' }} onClick={() => onSelectTable(table)}>
-              <h2 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>{table.name}</h2>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                {table.name}
+                {table.type === 'VIP' && (
+                  <span style={{ fontSize: '0.75rem', color: '#f87171', background: 'rgba(239, 68, 68, 0.1)', padding: '2px 8px', borderRadius: '10px', border: '1px solid rgba(239, 68, 68, 0.2)', fontWeight: 800 }}>
+                    💎 VIP
+                  </span>
+                )}
+              </h2>
+              {table.type === 'VIP' && table.serviceCharge > 0 && (
+                <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '8px', fontWeight: 700 }}>
+                  Phí VIP: +{table.serviceCharge.toLocaleString()} đ
+                </div>
+              )}
               <span style={{
                 color: table.isOccupied ? 'var(--danger-color)' : 'var(--success-color)',
                 fontWeight: '600'

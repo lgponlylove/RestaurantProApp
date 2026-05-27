@@ -274,7 +274,8 @@ export default function CashierDashboard({ showToast }) {
   // Xác nhận thanh toán
   const handleCheckout = async (table) => {
     const total = getTableTotal(table.id);
-    const finalTotal = total * (1 - discount / 100);
+    const serviceCharge = table.type === 'VIP' ? (table.serviceCharge || 0) : 0;
+    const finalTotal = (total + serviceCharge) * (1 - discount / 100);
     const details = getTableOrders(table.id).map(o => o.orderDetails).join("; ");
 
     if (window.confirm(`Xác nhận thanh toán hóa đơn ${table.name} với số tiền là ${finalTotal.toLocaleString()} đ?`)) {
@@ -286,6 +287,7 @@ export default function CashierDashboard({ showToast }) {
           tableName: table.name,
           orderDetails: details,
           totalAmount: total,
+          serviceCharge: serviceCharge,
           discount: discount,
           finalAmount: finalTotal,
           paymentMethod: paymentMethod,
@@ -437,6 +439,14 @@ export default function CashierDashboard({ showToast }) {
                     <span>{getTableTotal(selectedTable.id).toLocaleString()} đ</span>
                   </div>
 
+                  {/* Phí dịch vụ VIP */}
+                  {selectedTable.type === 'VIP' && (selectedTable.serviceCharge || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#f87171', fontWeight: 600 }}>
+                      <span>Phí dịch vụ VIP (💎):</span>
+                      <span>+{(selectedTable.serviceCharge || 0).toLocaleString()} đ</span>
+                    </div>
+                  )}
+
                   {/* Giảm giá */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Giảm giá (%):</span>
@@ -473,7 +483,7 @@ export default function CashierDashboard({ showToast }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>Tổng cộng:</span>
                     <strong style={{ color: '#fbbf24', fontSize: '1.4rem' }}>
-                      {(getTableTotal(selectedTable.id) * (1 - discount / 100)).toLocaleString()} đ
+                      {((getTableTotal(selectedTable.id) + (selectedTable.type === 'VIP' ? (selectedTable.serviceCharge || 0) : 0)) * (1 - discount / 100)).toLocaleString()} đ
                     </strong>
                   </div>
                 </div>
@@ -627,10 +637,16 @@ export default function CashierDashboard({ showToast }) {
                 <span>Tạm tính:</span>
                 <span>{currentReceipt.totalAmount.toLocaleString()} đ</span>
               </div>
+              {currentReceipt.serviceCharge > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Phí dịch vụ VIP:</span>
+                  <span>+{currentReceipt.serviceCharge.toLocaleString()} đ</span>
+                </div>
+              )}
               {currentReceipt.discount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Giảm giá ({currentReceipt.discount}%):</span>
-                  <span>-{(currentReceipt.totalAmount * currentReceipt.discount / 100).toLocaleString()} đ</span>
+                  <span>-{((currentReceipt.totalAmount + currentReceipt.serviceCharge) * currentReceipt.discount / 100).toLocaleString()} đ</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.05rem', marginTop: '6px' }}>
