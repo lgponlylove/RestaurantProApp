@@ -118,11 +118,20 @@ app.MapGet("/api/menu", async (RestaurantDbContext db) =>
 app.MapPost("/api/orders", async (RestaurantDbContext db, IHubContext<OrderHub> hubContext, OrderDto dto) =>
 {
     var table = await db.Tables.FindAsync(dto.TableId);
-    string tableName = table?.Name ?? $"Bàn {dto.TableId}";
-    if (table != null)
+    if (table == null) return Results.NotFound(new { message = "Không tìm thấy bàn!" });
+
+    // Cơ chế bảo mật: Nếu là đơn hàng từ khách quét QR (chưa duyệt), bắt buộc khớp mã phiên ăn CurrentSessionToken
+    bool isGuestOrder = !(dto.IsApproved ?? true);
+    if (isGuestOrder)
     {
-        table.IsOccupied = true;
+        if (string.IsNullOrEmpty(dto.Token) || dto.Token != table.CurrentSessionToken)
+        {
+            return Results.BadRequest(new { message = "Mã QR của bàn đã hết hạn hoặc không hợp lệ! Vui lòng quét lại mã QR mới tại bàn ăn." });
+        }
     }
+
+    string tableName = table.Name;
+    table.IsOccupied = true;
 
     var order = new Order
     {
@@ -350,6 +359,16 @@ app.MapDelete("/api/tables/{id}", async (RestaurantDbContext db, int id) =>
     return Results.Ok(new { message = "Đã xóa bàn/phòng thành công" });
 }).RequireAuthorization();
 
+app.MapPut("/api/tables/{id}/reset-token", async (RestaurantDbContext db, int id) =>
+{
+    var table = await db.Tables.FindAsync(id);
+    if (table == null) return Results.NotFound();
+
+    table.CurrentSessionToken = Guid.NewGuid().ToString("N").Substring(0, 8);
+    await db.SaveChangesAsync();
+    return Results.Ok(table);
+}).RequireAuthorization();
+
 // ── Thống Kê Doanh Thu ───────────────────────────────────────────────
 app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
 {
@@ -399,6 +418,6 @@ app.MapGet("/api/stats/revenue", async (RestaurantDbContext db) =>
 var port = Environment.GetEnvironmentVariable("PORT") ?? "5296";
 app.Run($"http://0.0.0.0:{port}");
 
-public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount, bool? IsApproved = null);
+public record OrderDto(int TableId, string OrderDetails, string TicketId, double TotalAmount, bool? IsApproved = null, string? Token = null);
 public record UpdateOrderDto(string OrderDetails, double TotalAmount, string? CancelledItemName = null, int CancelledQty = 0, double CancelledPrice = 0, string? Reason = null);
 public record LoginDto(string Username, string Password);

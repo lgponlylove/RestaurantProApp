@@ -18,11 +18,11 @@ namespace RestaurantApi.Data
         {
             // Seed Data — chạy khi migration lần đầu
             modelBuilder.Entity<Table>().HasData(
-                new Table { Id = 1, Name = "Bàn 1", IsOccupied = false, Type = "Standard", ServiceCharge = 0 },
-                new Table { Id = 2, Name = "Bàn 2", IsOccupied = false, Type = "Standard", ServiceCharge = 0 },
-                new Table { Id = 3, Name = "Bàn 3", IsOccupied = false, Type = "Standard", ServiceCharge = 0 },
-                new Table { Id = 4, Name = "Phòng VIP 1", IsOccupied = false, Type = "VIP", ServiceCharge = 100000 },
-                new Table { Id = 5, Name = "Phòng VIP 2", IsOccupied = false, Type = "VIP", ServiceCharge = 150000 }
+                new Table { Id = 1, Name = "Bàn 1", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "t1token1" },
+                new Table { Id = 2, Name = "Bàn 2", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "t2token2" },
+                new Table { Id = 3, Name = "Bàn 3", IsOccupied = false, Type = "Standard", ServiceCharge = 0, CurrentSessionToken = "t3token3" },
+                new Table { Id = 4, Name = "Phòng VIP 1", IsOccupied = false, Type = "VIP", ServiceCharge = 100000, CurrentSessionToken = "t4token4" },
+                new Table { Id = 5, Name = "Phòng VIP 2", IsOccupied = false, Type = "VIP", ServiceCharge = 150000, CurrentSessionToken = "t5token5" }
             );
 
             modelBuilder.Entity<MenuItem>().HasData(

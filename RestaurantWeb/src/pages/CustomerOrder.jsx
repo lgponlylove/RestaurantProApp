@@ -4,6 +4,9 @@ import { api, signalRService } from '../services/api';
 
 export default function CustomerOrder() {
   const { tableId } = useParams();
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlToken = urlParams.get('token') || '';
+
   const [table, setTable] = useState(null);
   const [menuItems, setMenuItems] = useState([]);
   const [cart, setCart] = useState([]);
@@ -38,7 +41,7 @@ export default function CustomerOrder() {
 
     api.getTables().then(tables => {
       const found = tables.find(t => t.id === parseInt(tableId));
-      setTable(found || { id: parseInt(tableId), name: `Bàn ${tableId}` });
+      setTable(found || { id: parseInt(tableId), name: `Bàn ${tableId}`, currentSessionToken: '' });
     });
     api.getMenuItems().then(setMenuItems);
     loadOrderedHistory();
@@ -84,7 +87,8 @@ export default function CustomerOrder() {
         orderDetails,
         ticketId,
         totalAmount,
-        isApproved: false
+        isApproved: false,
+        token: urlToken
       });
       setOrdered(true);
       setCart([]);
@@ -94,6 +98,40 @@ export default function CustomerOrder() {
       showToast('Lỗi kết nối. Vui lòng thử lại!', 'error');
     }
   };
+
+  // ── KIỂM TRA BẢO MẬT: XÁC THỰC MÃ PHIÊN QR CODE ──
+  if (!table) {
+    return (
+      <div className="flex-center" style={{ minHeight: '100vh', flexDirection: 'column', gap: '15px' }}>
+        <div style={{ border: '4px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--primary-color)', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }} />
+        <p style={{ color: 'var(--text-secondary)' }}>Đang xác thực thông tin bàn ăn...</p>
+      </div>
+    );
+  }
+
+  if (table && urlToken !== table.currentSessionToken) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center',
+        background: 'linear-gradient(135deg, #090d16 0%, #111827 100%)', color: '#fff'
+      }}>
+        <div className="glass-panel animate-slide-up" style={{ padding: '3.5rem 2rem', maxWidth: '420px', borderTop: '4px solid var(--danger-color)' }}>
+          <div style={{ fontSize: '4.5rem', marginBottom: '1.5rem' }}>🔒</div>
+          <h1 style={{ fontSize: '1.8rem', marginBottom: '1rem', color: 'var(--danger-color)', fontWeight: 800 }}>
+            Mã QR Hết Hạn!
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', lineHeight: 1.7, fontSize: '0.95rem' }}>
+            Mã QR của <strong>{table.name}</strong> đã hết hạn hoặc phiên phục vụ trước đã kết thúc.<br />
+            Vui lòng quét lại **Mã QR mới** tại bàn để bắt đầu gọi món! 🙏
+          </p>
+          <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.2)', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+            ID: {table.id} | Code: ERR_QR_SESSION_EXPIRED
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (ordered) {
     return (

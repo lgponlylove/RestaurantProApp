@@ -3,7 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 export default function QRCodeDisplay({ table, onClose }) {
   const [copied, setCopied] = useState(false);
-  const url = `${window.location.origin}/order/${table.id}`;
+  const url = `${window.location.origin}/order/${table.id}?token=${table.currentSessionToken || ''}`;
 
   const copyUrl = () => {
     navigator.clipboard.writeText(url).then(() => {

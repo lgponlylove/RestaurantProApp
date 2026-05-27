@@ -55,6 +55,7 @@ namespace RestaurantApi.Hubs
             if (table != null)
             {
                 table.IsOccupied = false;
+                table.CurrentSessionToken = Guid.NewGuid().ToString("N").Substring(0, 8); // Vô hiệu hóa mã QR cũ tức thì!
             }
 
             // Lấy toàn bộ đơn hàng chưa thanh toán của bàn này
